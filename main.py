@@ -19,7 +19,7 @@ discord.utils.setup_logging(level=logging.INFO)
 logging.getLogger('discord.gateway').setLevel(30)   # Stops a flood of "gate RESUMED" messages
 
 bot = discord.ext.commands.Bot(
-    description='Robloxian Session bot',
+    description='Donut :3',
     command_prefix=discord.ext.commands.when_mentioned,
     intents=discord.Intents.default())
 
