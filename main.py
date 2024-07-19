@@ -19,13 +19,36 @@ discord.utils.setup_logging(level=logging.INFO)
 logging.getLogger('discord.gateway').setLevel(30)   # Stops a flood of "gate RESUMED" messages
 
 bot = discord.ext.commands.Bot(
-    description='RCC Bot helps all Roblox Car Community servers manage themselves. Open-source project, hosted for free.',
+    description='Robloxian Session bot',
     command_prefix=discord.ext.commands.when_mentioned,
     intents=discord.Intents.default())
 
 # Now we define some functions that will be used throughout the bot
 
 bot.webhooks = dict()
+
+class WebhookError(Exception):
+    """Exception for whenever there is an error relating managing webhooks"""
+    pass
+
+bot.exceptions.WebhookError = WebhookError
+
+async def is_bot_webhook(webhook: discord.Webhook) -> bool:
+    """Check if the webhook is created by THIS bot
+
+    Args:
+        webhook (discord.Webhook): The webhook to check
+    """
+    if webhook.is_partial():
+        webhook = await webhook.fetch()
+    
+    if not webhook.type.name == 'application':
+        return False
+    
+    if not webhook.user == bot.user:
+        return False
+    
+    return True
 
 async def cache_channel_webhook(channel: discord.TextChannel, webhook: discord.Webhook = None):
     bot_webhook = webhook if webhook else (bot.webhooks[channel.id] if bot.webhooks.get(channel.id) else None)
@@ -72,14 +95,14 @@ async def grab_channel_webhook(channel: discord.TextChannel) -> discord.Webhook:
         if not resp: 
             for webhook in (await channel.webhooks()):
                 # check if it has 'state attached' and is the bots webhook
-                if webhook.is_authenticated():
+                if await is_bot_webhook():
                     bot_webhook = webhook
             
             if not bot_webhook:
                 async with bot.psql.acquire() as connection:
                     guild_settings = await connection.fetch("SELECT * FROM webhook_configs WHERE guild_id = $1", int(channel.guild.id))
                 if not guild_settings: 
-                    raise Exception('Guild is not registered with any configuration')
+                    raise bot.exceptions.WebhookError('Guild is not registered with any configuration')
                 guild_settings = dict(guild_settings[0])
                 bot_webhook = await channel.create_webhook(name=guild_settings['name'], avatar=guild_settings['avatar'])
             await cache_channel_webhook(channel, bot_webhook)
@@ -87,6 +110,13 @@ async def grab_channel_webhook(channel: discord.TextChannel) -> discord.Webhook:
         # assign webhook object to channel for ease and then return it 
         bot.webhooks[channel.id] = bot_webhook
     return bot.webhooks[channel.id]
+
+async def delete_guild_webhooks(guild: discord.Guild, reason: str = None):
+    for webhook in (await guild.webhooks()):
+        if not await is_bot_webhook():
+            continue
+        else:
+            await webhook.delete(reason=reason)
         
 
 @bot.event
