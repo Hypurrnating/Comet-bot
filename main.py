@@ -5,6 +5,7 @@ import asyncpg
 import aiosqlite
 import logging
 import os
+import platform
 import pathlib
 import asyncio
 from datetime import datetime
@@ -27,11 +28,15 @@ bot = discord.ext.commands.Bot(
 
 bot.webhooks = dict()
 
+class errors():
+    pass
+
 class WebhookError(Exception):
     """Exception for whenever there is an error relating managing webhooks"""
     pass
 
-bot.exceptions.WebhookError = WebhookError
+bot.errors = errors()
+bot.errors.WebhookError = WebhookError
 
 async def is_bot_webhook(webhook: discord.Webhook) -> bool:
     """Check if the webhook is created by THIS bot
@@ -55,18 +60,20 @@ async def cache_channel_webhook(channel: discord.TextChannel, webhook: discord.W
     if not bot_webhook:
         raise Exception('No webhook passed, and none in channel attribute')
 
-    resp = await (await bot.webhooks_db.cursor()).execute("SELECT * FROM channel_webhooks WHERE channel_id = ?", 
+    resp = await (await bot.sqlite.cursor()).execute("SELECT * FROM channel_webhooks WHERE channel_id = ?", 
                                                           (channel.id,))
 
     if resp:
-        await (await bot.webhooks_db.cursor()).execute("UPDATE channel_webhooks SET url = ? WHERE channel_id = ?",
+        await (await bot.sqlite.cursor()).execute("UPDATE channel_webhooks SET url = ? WHERE channel_id = ?",
                                              (bot_webhook.url,
                                               channel.id))
         
     if not resp:
-        await (await bot.webhooks_db.cursor()).execute("INSERT INTO channel_webhooks(channel_id, url) VALUES (?, ?)",
+        await (await bot.sqlite.cursor()).execute("INSERT INTO channel_webhooks(channel_id, url) VALUES (?, ?)",
                                                        (channel.id,
                                                         bot_webhook.url))
+    
+    await bot.sqlite.commit()
 
 async def grab_channel_webhook(channel: discord.TextChannel) -> discord.Webhook:
     """
@@ -85,7 +92,7 @@ async def grab_channel_webhook(channel: discord.TextChannel) -> discord.Webhook:
     
     else:
         # get a cached webhook url from sqlite
-        resp = await (await (await bot.webhooks_db.cursor()).execute("SELECT * FROM channel_webhooks WHERE channel_id = ?", (channel.id,))).fetchone()
+        resp = await (await (await bot.sqlite.cursor()).execute("SELECT * FROM channel_webhooks WHERE channel_id = ?", (channel.id,))).fetchone()
 
         # if it does exist in sqlite cache then create the partial webhook, and then create the complete one by .fetch()
         if resp:
@@ -95,14 +102,14 @@ async def grab_channel_webhook(channel: discord.TextChannel) -> discord.Webhook:
         if not resp: 
             for webhook in (await channel.webhooks()):
                 # check if it has 'state attached' and is the bots webhook
-                if await is_bot_webhook():
+                if await is_bot_webhook(webhook):
                     bot_webhook = webhook
             
             if not bot_webhook:
                 async with bot.psql.acquire() as connection:
                     guild_settings = await connection.fetch("SELECT * FROM webhook_configs WHERE guild_id = $1", int(channel.guild.id))
                 if not guild_settings: 
-                    raise bot.exceptions.WebhookError('Guild is not registered with any configuration')
+                    raise bot.errors.WebhookError('Guild is not registered with any configuration')
                 guild_settings = dict(guild_settings[0])
                 bot_webhook = await channel.create_webhook(name=guild_settings['name'], avatar=guild_settings['avatar'])
             await cache_channel_webhook(channel, bot_webhook)
@@ -121,10 +128,21 @@ async def delete_guild_webhooks(guild: discord.Guild, reason: str = None):
 
 @bot.event
 async def on_ready():
-    webhook = await grab_channel_webhook(await bot.fetch_channel(1262891789287952468))
-    await webhook.send('gugu gaga')
+    await bot.tree.sync()
 
 async def main():
+
+    # Use this method to figure out where to store the sqlite db file. Helps run the script on my windows pc and on the linux host without issues
+    def get_db_loc():
+        print(f'Running on: {platform.system()}')
+        if platform.system() == 'Windows':
+            return '.db'
+        if platform.system() == 'Ubuntu':
+            return '/s/.db'
+
+    async def create_tables():
+        await (await bot.sqlite.cursor()).execute('CREATE TABLE IF NOT EXISTS channel_webhooks(id INTEGER PRIMARY KEY AUTOINCREMENT, channel_id BIGINT, url VARCHAR(1500))')
+        await (await bot.sqlite.cursor()).execute('CREATE TABLE IF NOT EXISTS guild_starboards(id INTEGER PRIMARY KEY AUTOINCREMENT, guild_id BIGINT, channel_id BIGINT, added_by BIGINT)')
     
     for x in pathlib.Path(f'./extensions').iterdir():
         if x.is_file():
@@ -137,9 +155,8 @@ async def main():
                                    port=os.environ.get('PGPORT')) as pool:
 
         bot.psql = pool
-        bot.webhooks_db = await aiosqlite.connect('webhooks.db')
-        bot.webhooks_db_cursor = bot.webhooks_db.cursor
-        await (await bot.webhooks_db.cursor()).execute('CREATE TABLE IF NOT EXISTS channel_webhooks(id INTEGER PRIMARY KEY AUTOINCREMENT, channel_id BIGINT, url VARCHAR(1500))')
+        bot.sqlite = await aiosqlite.connect(get_db_loc())
+        await create_tables()
 
         await bot.start(os.environ.get('TOKEN'))
 
