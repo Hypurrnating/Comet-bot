@@ -43,19 +43,25 @@ class starboard_cog(discord.ext.commands.Cog):
                     await channel.send(content=message.content, embed=message.embeds[0])
                     await asyncio.sleep(1)  # Prevent ratelimits. 
 
-    @discord.ext.commands.Cog.listener('on_raw_reaction_add')
-    async def star_listener(self, payload: discord.RawReactionActionEvent):
-        if not payload.emoji.name == '⭐':
+    @discord.ext.commands.Cog.listener('on_reaction_add')
+    async def star_listener(self, reaction: discord.Reaction, user: discord.Member):
+        if not reaction.emoji.name == '⭐':
             return
 
-        channel: discord.TextChannel = self.bot.get_channel(payload.channel_id) if self.bot.get_channel(payload.channel_id) else await self.bot.fetch_channel(payload.channel_id)
-        message: discord.Message = await channel.fetch_message(payload.message_id)
-        author = message.guild.get_member(payload.message_author_id) if message.guild.get_member(payload.message_author_id) else await message.guild.fetch_member(payload.message_author_id)
+        message: discord.Message = reaction.message
+        author = user
 
-        msg_stars = await (await (await self.bot.sqlite.execute('SELECT * FROM stars WHERE message_id = ?', (message.id,)))).fetchall()
-        if not len(msg_stars) >= 1:
+        _msg_stars = await (await (await self.bot.sqlite.execute('SELECT * FROM stars WHERE message_id = ?', (message.id,)))).fetchall()
+        if not len(_msg_stars) >= 1:
             return
-
+        
+        msg_stars = [{'id': star[0], 'guild_id': star[1], 'channel_id': star[2], 'message_id': star[3], 'user_id': star[4]} for star in _msg_stars]
+        all_users = [star['user_id'] for star in msg_stars]
+        if user.id in all_users:
+            return
+        
+        await self.bot.sqlite.execute('INSERT INTO stars(guild_id, channel_id, message_id, user_id) VALUES (?, ?, ?, ?)', (message.guild.id, message.channel.id, message.id, user.id))
+        await self.bot.sqlite.commit()
         
         resp = await (await (await self.bot.sqlite.cursor()).execute('SELECT * FROM guild_starboards WHERE guild_id = ?', (message.guild.id,))).fetchone()
         if resp: id, guild_id, channel_id, added_by = resp
@@ -65,14 +71,15 @@ class starboard_cog(discord.ext.commands.Cog):
         try:
             starboard: discord.TextChannel = self.bot.get_channel(channel_id) if self.bot.get_channel(channel_id) else await self.bot.fetch_channel(channel_id)
         except discord.NotFound:
-            await (await self.bot.sqlite.cursor()).execute('DELETE FROM guild_starboards WHERE channel_id = ?', (channel_id))
+            await self.bot.sqlite.execute('DELETE FROM guild_starboards WHERE channel_id = ?', (channel_id))
+            await self.bot.sqlite.commit()
 
         if not message.content and not message.attachments:
             await starboard.send(content=message.jump_url)
 
         if message.content or message.attachments:
             embed = discord.Embed(title='',
-                                    description=(message.content) if message.content else '',
+                                    description=message.content,
                                     color=0xfccf03)
             
             embed.timestamp = message.created_at
