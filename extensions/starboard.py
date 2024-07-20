@@ -43,17 +43,18 @@ class starboard_cog(discord.ext.commands.Cog):
                     await channel.send(content=message.content, embed=message.embeds[0])
                     await asyncio.sleep(1)  # Prevent ratelimits. 
 
-    @discord.ext.commands.Cog.listener('on_reaction_add')
-    async def star_listener(self, reaction: discord.Reaction, user: discord.Member):
-        if not reaction.emoji.name == '⭐':
+
+    @discord.ext.commands.Cog.listener('on_raw_reaction_add')
+    async def star_listener(self, payload: discord.RawReactionActionEvent):
+        if not payload.emoji.name == '⭐':
             return
 
-        message: discord.Message = reaction.message
-        author = user
+        channel: discord.TextChannel = self.bot.get_channel(payload.channel_id) if self.bot.get_channel(payload.channel_id) else await self.bot.fetch_channel(payload.channel_id)
+        message: discord.Message = await channel.fetch_message(payload.message_id)
+        author = message.author if isinstance(message.author, discord.Member) else await message.guild.fetch_member(payload.message_author_id)
+        user = payload.member
 
-        _msg_stars = await (await (await self.bot.sqlite.execute('SELECT * FROM stars WHERE message_id = ?', (message.id,)))).fetchall()
-        if not len(_msg_stars) >= 1:
-            return
+        _msg_stars = await (await self.bot.sqlite.execute('SELECT * FROM stars WHERE message_id = ?', (message.id,))).fetchall()
         
         msg_stars = [{'id': star[0], 'guild_id': star[1], 'channel_id': star[2], 'message_id': star[3], 'user_id': star[4]} for star in _msg_stars]
         all_users = [star['user_id'] for star in msg_stars]
@@ -62,6 +63,9 @@ class starboard_cog(discord.ext.commands.Cog):
         
         await self.bot.sqlite.execute('INSERT INTO stars(guild_id, channel_id, message_id, user_id) VALUES (?, ?, ?, ?)', (message.guild.id, message.channel.id, message.id, user.id))
         await self.bot.sqlite.commit()
+
+        if not len(_msg_stars)+1 >= 1:
+            return
         
         resp = await (await (await self.bot.sqlite.cursor()).execute('SELECT * FROM guild_starboards WHERE guild_id = ?', (message.guild.id,))).fetchone()
         if resp: id, guild_id, channel_id, added_by = resp
