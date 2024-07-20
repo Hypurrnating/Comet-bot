@@ -149,16 +149,16 @@ async def main():
         if x.is_file():
             await bot.load_extension(f'extensions.{x.name.split(".")[0]}')
 
-    async with asyncpg.create_pool(database=os.environ.get('PGDATABASE'),
+        """async with asyncpg.create_pool(database=os.environ.get('PGDATABASE'),
                                    host=os.environ.get('PGHOST'),
                                    user=os.environ.get('PGUSER'),
                                    password=os.environ.get('PGPASSWORD'),
                                    port=os.environ.get('PGPORT')) as pool:
 
-        bot.psql = pool
-        bot.sqlite = await aiosqlite.connect(get_db_loc())
-        await create_tables()
+        bot.psql = pool"""
+    bot.sqlite = await aiosqlite.connect(get_db_loc())
+    await create_tables()
 
-        await bot.start(os.environ.get('TOKEN'))
+    await bot.start(os.environ.get('TOKEN'))
 
 asyncio.run(main())
