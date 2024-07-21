@@ -54,6 +54,7 @@ class starboard_cog(discord.ext.commands.Cog):
 
     @discord.ext.commands.Cog.listener('on_raw_reaction_add')
     async def star_listener(self, payload: discord.RawReactionActionEvent):
+        # ignore if not a star
         if not payload.emoji.name == '⭐':
             return
 
@@ -62,6 +63,18 @@ class starboard_cog(discord.ext.commands.Cog):
         message: discord.Message = await channel.fetch_message(payload.message_id)
         author = message.author if isinstance(message.author, discord.Member) else await message.guild.fetch_member(payload.message_author_id)
         user = payload.member
+
+        # load the starboard 
+        resp = await (await (await self.bot.sqlite.cursor()).execute('SELECT * FROM guild_starboards WHERE guild_id = ?', (message.guild.id,))).fetchone()
+        if resp: id, guild_id, channel_id, added_by = resp
+    # if there is no starboard for this channel, then ignore
+        if not resp:
+            return
+        try:
+            starboard: discord.TextChannel = self.bot.get_channel(channel_id) if self.bot.get_channel(channel_id) else await self.bot.fetch_channel(channel_id)
+        except discord.NotFound:
+            await self.bot.sqlite.execute('DELETE FROM guild_starboards WHERE channel_id = ?', (channel_id))
+            await self.bot.sqlite.commit()
 
         # get previous stars recorded for this message
         _msg_stars = await (await self.bot.sqlite.execute('SELECT * FROM stars WHERE message_id = ?', (message.id,))).fetchall()
@@ -81,18 +94,6 @@ class starboard_cog(discord.ext.commands.Cog):
         # check if there are enough stars to trigger starboard
         if not len(_msg_stars)+1 >= 1:
             return
-        
-        # load the starboard 
-        resp = await (await (await self.bot.sqlite.cursor()).execute('SELECT * FROM guild_starboards WHERE guild_id = ?', (message.guild.id,))).fetchone()
-        if resp: id, guild_id, channel_id, added_by = resp
-        # if there is no starboard for this channel, then ignore
-        if not resp:
-            return
-        try:
-            starboard: discord.TextChannel = self.bot.get_channel(channel_id) if self.bot.get_channel(channel_id) else await self.bot.fetch_channel(channel_id)
-        except discord.NotFound:
-            await self.bot.sqlite.execute('DELETE FROM guild_starboards WHERE channel_id = ?', (channel_id))
-            await self.bot.sqlite.commit()
 
         # if there are no attachments and no text, then the message likely contains a sticker (which bots CAN view but i choose not to deal with it for now)
         if not message.content and not message.attachments:
