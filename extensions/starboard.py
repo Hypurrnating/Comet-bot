@@ -11,6 +11,14 @@ class starboard_cog(discord.ext.commands.Cog):
 
     starboard_group = discord.app_commands.Group(name='starboard', description='Starboard lets members of a server "pin" a message to a separate channel by reacting with a star')
 
+    @starboard_group.command(name='disable', description='Disable the starboard for this server.')
+    @app_commands.checks.has_permissions(administrator = True)
+    async def starboard(self, interaction: discord.Interaction):
+        await interaction.response.defer(thinking=True)
+        await self.bot.sqlite.execute('DELETE FROM guild_starboards WHERE guild_id = ?', (interaction.guild.id,))
+        await self.bot.sqlite.commit()
+        await interaction.followup.send(content=f'Disabled starboard for this server')
+
     @starboard_group.command(name='set', description='Set a server channel to be the starboard. This where all starred messages will get sent')
     @app_commands.checks.has_permissions(manage_channels = True)
     @app_commands.describe(
