@@ -13,10 +13,10 @@ class bell_cog(discord.ext.commands.Cog):
 
     async def progress_bar(self, percent: int) -> str:
         if percent > 100:
-            done = 50
+            done = 25
         else:
-            done = int(percent/2)
-        progress_bar = f'```| {'█' * done}{' ' * (50 - done)} |```'
+            done = int(percent/4)
+        progress_bar = f'```| {'█' * done}{' ' * (25 - done)} |```'
         return progress_bar 
 
     @bell_group.command(name='bar')
