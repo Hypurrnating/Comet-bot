@@ -107,8 +107,7 @@ class starboard_cog(discord.ext.commands.Cog):
             
             embed.timestamp = message.created_at
             embed.set_author(name=author.display_name,
-                            url=f'https://discord.com/users/{
-                                author.id}',
+                            url=f'https://discord.com/users/{author.id}',
                             icon_url=author.guild_avatar.url if author.guild_avatar else (author.avatar.url if author.avatar else None))
             
             embed.add_field(name=' ', value=f'[Jump to message]({message.jump_url})')
