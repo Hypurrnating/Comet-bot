@@ -35,6 +35,10 @@ class Donut(discord.ext.commands.Bot):
         self.errors = self.errors()
         asyncio.create_task(self.setup_db())
 
+        for x in pathlib.Path(f'./extensions').iterdir():
+            if x.is_file():
+                asyncio.create_task(self.load_extension(f'extensions.{x.name.split(".")[0]}'))
+
     def get_db_loc(self):
         print(f'Running on: {platform.system()}')
         if platform.system() == 'Windows':
@@ -184,12 +188,6 @@ class Donut(discord.ext.commands.Bot):
 
 async def main():
     bot = Donut()
-
-    for x in pathlib.Path(f'./extensions').iterdir():
-        if x.is_file():
-            await bot.load_extension(f'extensions.{x.name.split(".")[0]}')
-
     tasks = [bot.quart.run(), bot.start(os.environ.get('TOKEN'))]
     await asyncio.gather(*tasks)
-
 asyncio.run(main())
