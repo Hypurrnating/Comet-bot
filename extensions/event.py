@@ -16,7 +16,7 @@ class event_cog(discord.ext.commands.Cog):
             done = 25
         else:
             done = int(percent/4)
-        progress_bar = f'```| {'|' * done}{' ' * (25 - done)} |```'
+        progress_bar = f'```| {"|" * done}{" " * (25 - done)} |```'
         return progress_bar 
 
 
