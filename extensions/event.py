@@ -11,6 +11,7 @@ class event_cog(discord.ext.commands.Cog):
 
     event_group = discord.app_commands.Group(name='event', description='Commands that help you manage sessions')
 
+    
 
 
 async def setup(bot):

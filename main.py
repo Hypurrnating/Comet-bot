@@ -49,6 +49,7 @@ class Donut(discord.ext.commands.Bot):
         await (await self.sqlite.cursor()).execute('CREATE TABLE IF NOT EXISTS channel_webhooks(id INTEGER PRIMARY KEY AUTOINCREMENT, channel_id BIGINT, url VARCHAR(1500))')
         await (await self.sqlite.cursor()).execute('CREATE TABLE IF NOT EXISTS guild_starboards(id INTEGER PRIMARY KEY AUTOINCREMENT, guild_id BIGINT, channel_id BIGINT, added_by BIGINT)')
         await (await self.sqlite.cursor()).execute('CREATE TABLE IF NOT EXISTS stars(id INTEGER PRIMARY KEY AUTOINCREMENT, guild_id BIGINT, channel_id BIGINT, message_id BIGINT, user_id BIGINT)')
+        #await (await self.sqlite.cursor()).execute('CREATE TABLE IF NOT EXISTS events(id INTEGER PRIMARY KEY AUTOINCREMENT, )')
 
     async def setup_db(self):
         self.sqlite = await aiosqlite.connect(self.get_db_loc())
@@ -182,6 +183,11 @@ class Donut(discord.ext.commands.Bot):
                                     debug=True)
         
         def setup_routes(self):
+
+            @self.app.route('/')
+            async def _():
+                with open('./visualeyes.html', 'r') as file:
+                    return Response(file.read(), content_type='text/html')
             
             @self.app.route('/event/<int:guild_id>/<int:event_id>')
             async def _event(guild_id, event_id):
