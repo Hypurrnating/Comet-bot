@@ -186,7 +186,7 @@ class Donut(discord.ext.commands.Bot):
 
             @self.app.route('/')
             async def _():
-                with open('./visualeyes.html', 'r') as file:
+                with open('./main.html', 'r') as file:
                     return Response(file.read(), content_type='text/html')
             
             @self.app.route('/event/<int:guild_id>/<int:event_id>')
