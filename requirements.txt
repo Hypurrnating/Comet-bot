@@ -3,3 +3,4 @@ asyncpg
 aiosqlite
 aiohttp
 python-dotenv
+quart
