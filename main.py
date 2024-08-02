@@ -33,6 +33,23 @@ class Donut(discord.ext.commands.Bot):
 
         self.webhooks = dict()
         self.errors = self.errors()
+        asyncio.create_task(self.setup_db())
+
+    def get_db_loc(self):
+        print(f'Running on: {platform.system()}')
+        if platform.system() == 'Windows':
+            return '.db'
+        if platform.system() == 'Linux':
+            return '/s/.db'
+
+    async def create_tables(self):
+        await (await self.sqlite.cursor()).execute('CREATE TABLE IF NOT EXISTS channel_webhooks(id INTEGER PRIMARY KEY AUTOINCREMENT, channel_id BIGINT, url VARCHAR(1500))')
+        await (await self.sqlite.cursor()).execute('CREATE TABLE IF NOT EXISTS guild_starboards(id INTEGER PRIMARY KEY AUTOINCREMENT, guild_id BIGINT, channel_id BIGINT, added_by BIGINT)')
+        await (await self.sqlite.cursor()).execute('CREATE TABLE IF NOT EXISTS stars(id INTEGER PRIMARY KEY AUTOINCREMENT, guild_id BIGINT, channel_id BIGINT, message_id BIGINT, user_id BIGINT)')
+
+    async def setup_db(self):
+        self.sqlite = await aiosqlite.connect(self.get_db_loc())
+        await self.create_tables()
 
     async def on_ready(self):
         await self.tree.sync()
@@ -168,25 +185,9 @@ class Donut(discord.ext.commands.Bot):
 async def main():
     bot = Donut()
 
-    # Use this method to figure out where to store the sqlite db file. Helps run the script on my windows pc and on the linux host without issues
-    def get_db_loc():
-        print(f'Running on: {platform.system()}')
-        if platform.system() == 'Windows':
-            return '.db'
-        if platform.system() == 'Ubuntu':
-            return '/s/.db'
-
-    async def create_tables():
-        await (await bot.sqlite.cursor()).execute('CREATE TABLE IF NOT EXISTS channel_webhooks(id INTEGER PRIMARY KEY AUTOINCREMENT, channel_id BIGINT, url VARCHAR(1500))')
-        await (await bot.sqlite.cursor()).execute('CREATE TABLE IF NOT EXISTS guild_starboards(id INTEGER PRIMARY KEY AUTOINCREMENT, guild_id BIGINT, channel_id BIGINT, added_by BIGINT)')
-        await (await bot.sqlite.cursor()).execute('CREATE TABLE IF NOT EXISTS stars(id INTEGER PRIMARY KEY AUTOINCREMENT, guild_id BIGINT, channel_id BIGINT, message_id BIGINT, user_id BIGINT)')
-
     for x in pathlib.Path(f'./extensions').iterdir():
         if x.is_file():
             await bot.load_extension(f'extensions.{x.name.split(".")[0]}')
-
-    bot.sqlite = await aiosqlite.connect(get_db_loc())
-    await create_tables()
 
     tasks = [bot.quart.run(), bot.start(os.environ.get('TOKEN'))]
     await asyncio.gather(*tasks)
