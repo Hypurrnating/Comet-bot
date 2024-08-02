@@ -17,7 +17,6 @@ from quart import Quart, Response, jsonify, request, session, redirect, url_for,
 
 load_dotenv()
 
-
 class Donut(discord.ext.commands.Bot):
     def __init__(self, **options):
         intents = discord.Intents.default()
@@ -157,6 +156,14 @@ class Donut(discord.ext.commands.Bot):
             else:
                 await webhook.delete(reason=reason)
 
+    async def progress_bar(self, percent: int) -> str:
+        if percent > 100:
+            done = 25
+        else:
+            done = int(percent/4)
+        progress_bar = f'```| {"|" * done}{" " * (25 - done)} |```'
+        return progress_bar
+
 
     class QuartWeb():
         def __init__(self, bot):
@@ -166,7 +173,6 @@ class Donut(discord.ext.commands.Bot):
             self.app = Quart(__name__)
             self.app.config['SESSION_TYPE'] = 'sederunt'
             self.app.config['SECRET_KEY'] = 'sdrnt00123'
-            #self.app.static('/custom_static', 'my_static') #Is supposed to make a difference but apparently .static is not a property of app so commented
 
             self.setup_routes()
 
