@@ -140,24 +140,24 @@ class Donut(discord.ext.commands.Bot):
             async def _event1(guild_id, event_id):
                 await _event(guild_id=guild_id, event_id=event_id)
             @self.app.route('/event/<string:title>/<int:guild_id>/<int:event_id>')
-            async def _event1(title, guild_id, event_id):
+            async def _event2(title, guild_id, event_id):
                 await _event(title=title, guild_id=guild_id, event_id=event_id)
             
 
 async def main():
     bot = Donut()
-    redis = redis.Redis(host=os.environ.get('REDISHOST'),
-                        port=os.environ.get('REDISPORT'),
-                        password=os.environ.get('REDISPASSWORD'),
-                        username=os.environ.get('REDISUSER'),
-                        decode_responses=True)
+    _redis = redis.Redis(host=os.environ.get('REDISHOST'),
+                         port=os.environ.get('REDISPORT'),
+                         password=os.environ.get('REDISPASSWORD'),
+                         username=os.environ.get('REDISUSER'),
+                         decode_responses=True)
     async with asyncpg.create_pool(database=os.environ.get('PGDATABASE'),
                                    host=os.environ.get('PGHOST'),
                                    user=os.environ.get('PGUSER'),
                                    password=os.environ.get('PGPASSWORD'),
                                    port=os.environ.get('PGPORT')) as psql:
         bot.psql = psql
-        bot.redis = redis
+        bot.redis = _redis
         tasks = [bot.quart.run(), bot.start(os.environ.get('TOKEN'))]
         await asyncio.gather(*tasks)
 asyncio.run(main())
