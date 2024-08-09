@@ -58,19 +58,7 @@ class Donut(discord.ext.commands.Bot):
             class WebhookError(Exception):
                 """Exception for whenever there is an error relating managing webhooks"""
                 pass
-            self.WebhookError = WebhookError
-
-    async def grab_webhook(self, channel: discord.TextChannel) -> discord.Webhook | None:
-        if not isinstance(channel, discord.TextChannel):
-            return
-        
-        channel_webhooks = await channel.webhooks()
-        for webhook in channel_webhooks:
-            if await self.is_bot_webhook(webhook):
-                return webhook
-        
-        return await channel.create_webhook(name=self.user.name, avatar=await self.user.avatar.read())
-    
+            self.WebhookError = WebhookError    
 
     async def is_bot_webhook(self, webhook: discord.Webhook) -> bool:
         """Check if the webhook is created by THIS bot
@@ -89,75 +77,16 @@ class Donut(discord.ext.commands.Bot):
         
         return True
 
-    async def _store_channel_webhook(self, channel: discord.TextChannel, webhook: discord.Webhook = None):
-        bot_webhook = webhook if webhook else (bot.webhooks[channel.id] if bot.webhooks.get(channel.id) else None)
-        if not bot_webhook:
-            raise Exception('No webhook passed, and none in channel attribute')
+    async def grab_webhook(self, channel: discord.TextChannel) -> discord.Webhook | None:
+        if not isinstance(channel, discord.TextChannel):
+            return
 
-        resp = await (await self.sqlite.cursor()).execute("SELECT * FROM channel_webhooks WHERE channel_id = ?", 
-                                                            (channel.id,))
+        channel_webhooks = await channel.webhooks()
+        for webhook in channel_webhooks:
+            if await self.is_bot_webhook(webhook):
+                return webhook
 
-        if resp:
-            await (await self.sqlite.cursor()).execute("UPDATE channel_webhooks SET url = ? WHERE channel_id = ?",
-                                                (bot_webhook.url,
-                                                channel.id))
-            
-        if not resp:
-            await (await self.sqlite.cursor()).execute("INSERT INTO channel_webhooks(channel_id, url) VALUES (?, ?)",
-                                                        (channel.id,
-                                                            bot_webhook.url))
-        
-        await self.sqlite.commit()
-
-    async def grab_channel_webhook(self, channel: discord.TextChannel) -> discord.Webhook:
-        """
-
-        Args:
-            channel (discord.TextChannel): _description_
-
-        Returns:
-            discord.Webhook: _description_
-        """
-        bot_webhook = None
-
-        # This checks if a webhook has been assigned to a channel already
-        if self.webhooks.get(channel.id):
-            return self.webhooks[channel.id]
-        
-        else:
-            # get a stored webhook url from sqlite
-            resp = await (await (await self.sqlite.cursor()).execute("SELECT * FROM channel_webhooks WHERE channel_id = ?", (channel.id,))).fetchone()
-
-            # if it does exist in sqlite storage then create the partial webhook, and then create the complete one by .fetch()
-            if resp:
-                bot_webhook = await (discord.Webhook.from_url(resp['url'])).fetch()
-
-            # if it doesn't exist in sqlite storage then fetch all webhooks in channel, if found use it and store it, if not found create one and store it.
-            if not resp: 
-                for webhook in (await channel.webhooks()):
-                    # check if it has 'state attached' and is the bots webhook
-                    if await self._is_bot_webhook(webhook):
-                        bot_webhook = webhook
-                
-                if not bot_webhook:
-                    async with self.psql.acquire() as connection:
-                        guild_settings = await connection.fetch("SELECT * FROM webhook_configs WHERE guild_id = $1", int(channel.guild.id))
-                    if not guild_settings: 
-                        raise self.errors.WebhookError('Guild is not registered with any configuration')
-                    guild_settings = dict(guild_settings[0])
-                    bot_webhook = await channel.create_webhook(name=guild_settings['name'], avatar=guild_settings['avatar'])
-                await self._store_channel_webhook(channel, bot_webhook)
-            
-            # assign webhook object to channel for ease and then return it 
-            self.webhooks[channel.id] = bot_webhook
-        return self.webhooks[channel.id]
-
-    async def delete_guild_webhooks(self, guild: discord.Guild, reason: str = None):
-        for webhook in (await guild.webhooks()):
-            if not await self._is_bot_webhook():
-                continue
-            else:
-                await webhook.delete(reason=reason)
+        return await channel.create_webhook(name=self.user.name, avatar=await self.user.avatar.read())
 
     async def progress_bar(self, percent: int) -> str:
         if percent > 100:
