@@ -1,6 +1,7 @@
 discord.py
 asyncpg
-aiosqlite
+redis[hiredis]
 aiohttp
 python-dotenv
 quart
+validators
