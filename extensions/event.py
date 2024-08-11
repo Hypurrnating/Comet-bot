@@ -59,7 +59,7 @@ class event_cog(discord.ext.commands.Cog):
         try:
             config = tomllib.loads(toml)
         except Exception as exception:
-            await interaction.followup.send(content=f'Ran into an error parsing the config:\n{exception}')
+            await interaction.followup.send(content=f'Ran into an error parsing the config:\n{exception}'); print(toml); return
         await interaction.followup.send(config)
         
 
