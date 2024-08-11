@@ -96,7 +96,7 @@ class Donut(discord.ext.commands.Bot):
         def __init__(self, bot):
             self.bot: discord.ext.commands.bot = bot
             self.host = '0.0.0.0'
-            self.port = int(os.environ.get('PORT', default=80))
+            self.port = int(os.environ.get('PORT', default=8080))
             self.app = Quart(__name__)
             self.app.config['SESSION_TYPE'] = 'sederunt'
             self.app.config['SECRET_KEY'] = 'sdrnt00123'
