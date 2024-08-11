@@ -22,22 +22,22 @@ class event_cog(discord.ext.commands.Cog):
 
     async def preprocess_toml(self, toml: str) -> str:
         # Process titles
-        pattern = re.compile('\\[.+\\]')
-        tables = re.findall(pattern, toml)
-        print(tables)
-        if not tables:
-            return # Because there needs to be at least one table
-        for table in tables:
-            # Check if the title isn't already wrapped in quotes
-            pattern = re.compile('\\[".+"\\]')
-            check = re.search(pattern, table)
-            if check: 
-                continue
-            # Wrap it in quotes
-            pattern = re.compile('[a-zA-Z0-9_\\s\\.-]+')
-            _title = re.search(pattern, table).group()
-            title_ = f'"{_title}"'
-            toml = toml.replace(_title, title_)
+        for line in toml.splitlines():
+            pattern = re.compile('^\\[.+\\]')
+            tables = re.findall(pattern, line)
+            if not tables:
+                continue 
+            for table in tables:
+                # Check if the title isn't already wrapped in quotes
+                pattern = re.compile('\\[".+"\\]')
+                check = re.search(pattern, table)
+                if check: 
+                    continue
+                # Wrap it in quotes
+                pattern = re.compile('[a-zA-Z0-9_\\s\\.-]+')
+                _title = re.search(pattern, table).group()
+                title_ = f'"{_title}"'
+                toml = toml.replace(_title, title_)
 
         # Process bools
         pattern = re.compile(r'.+\s*=\s*true|.+\s*=\s*false', re.IGNORECASE)
@@ -47,6 +47,7 @@ class event_cog(discord.ext.commands.Cog):
             _bool = re.search(pattern, bool).group()
             bool_ = pattern.sub(_bool.lower(), bool)
             toml = toml.replace(bool, bool_)
+        print(toml)
         return toml
 
     @app_commands.guild_only()
