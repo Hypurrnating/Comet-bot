@@ -20,7 +20,7 @@ class event_cog(discord.ext.commands.Cog):
 
     event_group = discord.app_commands.Group(name='event', description='Commands that help you manage sessions')
 
-    async def preprocess_toml(toml: str) -> str:
+    async def preprocess_toml(self, toml: str) -> str:
         # Process titles
         pattern = re.compile('\\[.+\\]')
         tables = re.findall(pattern, toml)
