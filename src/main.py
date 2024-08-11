@@ -16,7 +16,6 @@ from dotenv import load_dotenv
 import quart
 from quart import Quart, Response, jsonify, request, session, redirect, url_for, render_template, render_template_string, Markup, websocket
 
-
 load_dotenv()
 
 class Donut(discord.ext.commands.Bot):
@@ -114,35 +113,19 @@ class Donut(discord.ext.commands.Bot):
                                     debug=True)
         
         def setup_routes(self):
-
-            @self.app.route('/')
-            async def _():
-                with open('./main.html', 'r') as file:
-                    return Response(file.read(), content_type='text/html')
-                
-            async def _event(self, **kwargs):
-                guild = self.bot.get_guild(kwargs['guild_id'])
-                if not guild:
-                    return Response(status=400, response='Invalid Guild', mimetype='application/json')
-                event = await (await self.bot.sqlite.execute('SELECT * FROM events WHERE guild_id = ? AND event_id = ?')).fetchone()
-                guild_event = guild.get_scheduled_event(kwargs['event_id'])
-                if not event or guild_event:
-                    return Response(status=400, response='Invalid Event', mimetype='application/json')
-
-                if request.args.get('data_only').lower() == 'true':
-                    pass
-                
-                if kwargs['title']:
-                    if not kwargs['title'] == event[1]: # the title
-                        return redirect(location=request.url.replace(kwargs['title'], event[1]))
             
-            @self.app.route('/event/<int:guild_id>/<int:event_id>')
-            async def _event1(guild_id, event_id):
-                await _event(guild_id=guild_id, event_id=event_id)
-            @self.app.route('/event/<string:title>/<int:guild_id>/<int:event_id>')
-            async def _event2(title, guild_id, event_id):
-                await _event(title=title, guild_id=guild_id, event_id=event_id)
-            
+            @self.app.route('/event_inspect')
+            async def _eventinspect():
+                args = request.args
+                guild_id = args.get('guild_id')
+                event_id = args.get('event_id')
+                title = args.get('title')
+
+                if not self.bot.get_guild(guild_id):
+                    return Response(status=404, response='{"reason": "Invalid Guild ID"}', content_type='application/json')
+                guild = self.bot.get_guild(guild_id)
+                
+                # then find the event and handle that
 
 async def main():
     bot = Donut()

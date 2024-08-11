@@ -14,11 +14,19 @@ class event_cog(discord.ext.commands.Cog):
     def __init__(self, bot: discord.ext.commands.Bot) -> None:
         self.bot = bot
         super().__init__()
+        self._start_event_ctx = app_commands.ContextMenu(name='Start from message', callback=self.start_event_ctx)
+        self.bot.tree.add_command(self._start_event_ctx)
 
     def build_internal_join_url(self, guild_id: int, event_id: int, event_title: str = None):
         return f'https://donut.imady.pro/event/{event_title}/{guild_id}/{event_id}'
 
     event_group = discord.app_commands.Group(name='event', description='Commands that help you manage sessions')
+
+    @app_commands.guild_only()
+    async def start_event_ctx(self, interaction: discord.Interaction, message: discord.Message):
+        pass
+
+
 
     @discord.app_commands.command(name='new',
                                   description='Start a new event', 
