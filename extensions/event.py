@@ -19,10 +19,10 @@ class event_cog(discord.ext.commands.Cog):
 
     def setup_commands(self):
         
+        self.bot.tree.add_command(app_commands.ContextMenu(name='Start from message', callback=start_event_ctx))
         @app_commands.guild_only()
         async def start_event_ctx(self, interaction: discord.Interaction, message: discord.Message):
             pass
-        self.bot.tree.add_command(app_commands.ContextMenu(name='Start from message', callback=self.start_event_ctx))
 
 
         @discord.app_commands.command(name='new',
