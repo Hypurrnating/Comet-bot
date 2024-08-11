@@ -22,13 +22,12 @@ class event_cog(discord.ext.commands.Cog):
     async def start_event_ctx(self, interaction: discord.Interaction, message: discord.Message):
         pass
 
-    @discord.app_commands.command(name='new',
-                                    description='Start a new event')
+    @event_group.command(name='new',
+                                  description='Start a new event')
     @discord.app_commands.describe(title='Title of the event.',
-                                    description='What is this event about?',
-                                    post_to='Where should the event be announced?',
-                                    use_discord_event='Whether or not a discord event should be started alongside')
-    @event_group.command(name='new')
+                                   description='What is this event about?',
+                                   post_to='Where should the event be announced?',
+                                   use_discord_event='Whether or not a discord event should be started alongside')
     async def event_new(self, interaction: discord.Interaction,
                         title: str,
                         description: str,
