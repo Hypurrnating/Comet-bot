@@ -109,6 +109,10 @@ class Donut(discord.ext.commands.Bot):
                                     debug=True)
         
         def setup_routes(self):
+
+            @self.app.route('/upcheck')
+            async def upcheck():
+                return Response(response='Hello!', status=200)
             
             @self.app.route('/event_inspect')
             async def _eventinspect():
