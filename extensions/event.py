@@ -24,6 +24,7 @@ class event_cog(discord.ext.commands.Cog):
         # Process titles
         pattern = re.compile('\\[.+\\]')
         tables = re.findall(pattern, toml)
+        print(tables)
         if not tables:
             return # Because there needs to be at least one table
         for table in tables:
