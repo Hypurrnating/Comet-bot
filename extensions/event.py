@@ -16,7 +16,18 @@ class event_cog(discord.ext.commands.Cog):
     def __init__(self, bot: discord.ext.commands.Bot) -> None:
         self.bot = bot
         super().__init__()
-        self.bot.tree.add_command(app_commands.ContextMenu(name='Start from message', callback=self.start_event_ctx))
+        self.bot.tree.add_command(app_commands.ContextMenu(
+            name='Start from message', callback=self.start_event_ctx))
+        self.bot.tree.add_command(app_commands.ContextMenu(
+            name='End this event', callback=self.end_event_ctx))
+        self.bot.tree.add_command(app_commands.ContextMenu(
+            name='Edit this event', callback=self.edit_event_ctx))
+        self.bot.tree.add_command(app_commands.ContextMenu(
+            name='Lock this event', callback=self.lock_event_ctx))
+        self.bot.tree.add_command(app_commands.ContextMenu(
+            name='Co-host this event', callback=self.cohost_event_ctx))
+        self.bot.tree.add_command(app_commands.ContextMenu(
+            name='Add as co-host to event', callback=self.add_cohost_event_ctx))
 
     event_group = discord.app_commands.Group(name='event', description='Commands that help you manage sessions')
 
@@ -63,7 +74,27 @@ class event_cog(discord.ext.commands.Cog):
         except Exception as exception:
             await interaction.followup.send(content=f'Ran into an error parsing the config:\n{exception}'); print(toml); return
         await interaction.followup.send(config)
-        
+
+    @app_commands.guild_only()
+    async def end_event_ctx(self, interaction: discord.Interaction, message:discord.Message):
+        await interaction.response.defer(ephemeral=True, thinking=True)
+
+    @app_commands.guild_only()
+    async def edit_event_ctx(self, interaction: discord.Interaction, message: discord.Message):
+        await interaction.response.defer(ephemeral=True, thinking=True)
+
+    @app_commands.guild_only()
+    async def lock_event_ctx(self, interaction: discord.Interaction, message: discord.Message):
+        await interaction.response.defer(ephemeral=True, thinking=True)
+
+    @app_commands.guild_only()
+    async def cohost_event_ctx(self, interaction: discord.Interaction, message: discord.Message):
+        await interaction.response.defer(ephemeral=True, thinking=True)
+
+    @app_commands.guild_only()
+    async def add_cohost_event_ctx(self, interaction: discord.Interaction, member: discord.Member):
+        await interaction.response.defer(ephemeral=True, thinking=True)
+
 
     @event_group.command(name='new',
                                   description='Start a new event')
