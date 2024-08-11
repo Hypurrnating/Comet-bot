@@ -57,7 +57,7 @@ class event_cog(discord.ext.commands.Cog):
         tomls = re.findall(pattern, message.content)
         if not tomls:
             await interaction.followup.send(content=f'This message either doesnt contain any templates, or isnt formatted properly.'); return
-        toml = await self.preprocess_toml(tomls[0].replace('```toml', '').replace('```', ''))
+        toml = await self.preprocess_toml(tomls[0].replace('```toml', '').replace('```', '').strip())
         try:
             config = tomllib.loads(toml)
         except Exception as exception:
