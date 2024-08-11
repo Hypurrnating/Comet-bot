@@ -7,6 +7,8 @@ import typing
 import validators
 import urllib
 import urllib.parse
+import re
+import tomllib
 
 from discord.utils import MISSING
 
@@ -18,9 +20,48 @@ class event_cog(discord.ext.commands.Cog):
 
     event_group = discord.app_commands.Group(name='event', description='Commands that help you manage sessions')
 
+    async def preprocess_toml(toml: str) -> str:
+        # Process titles
+        pattern = re.compile('\\[.+\\]')
+        tables = re.findall(pattern, toml)
+        if not tables:
+            return # Because there needs to be at least one table
+        for table in tables:
+            # Check if the title isn't already wrapped in quotes
+            pattern = re.compile('\\[".+"\\]')
+            check = re.search(pattern, table)
+            if check: 
+                continue
+            # Wrap it in quotes
+            pattern = re.compile('[a-zA-Z0-9_\\s\\.-]+')
+            _title = re.search(pattern, table).group()
+            title_ = f'"{_title}"'
+            toml = toml.replace(_title, title_)
+
+        # Process bools
+        pattern = re.compile(r'.+\s*=\s*true|.+\s*=\s*false', re.IGNORECASE)
+        bools = re.findall(pattern, toml)
+        for bool in bools:
+            pattern = re.compile('true|false', re.IGNORECASE)
+            _bool = re.search(pattern, bool).group()
+            bool_ = pattern.sub(_bool.lower(), bool)
+            toml = toml.replace(bool, bool_)
+        return toml
+
     @app_commands.guild_only()
     async def start_event_ctx(self, interaction: discord.Interaction, message: discord.Message):
-        pass
+        await interaction.response.defer(ephemeral=True, thinking=True)
+        pattern = re.compile(r'```toml.*```', re.DOTALL)
+        tomls = re.findall(pattern, message.content)
+        if not tomls:
+            await interaction.followup.send(content=f'This message either doesnt contain any templates, or isnt formatted properly.'); return
+        toml = await self.preprocess_toml(tomls[0].replace('```toml', '').replace('```', ''))
+        try:
+            config = tomllib.loads(toml)
+        except Exception as exception:
+            await interaction.followup.send(content=f'Ran into an error parsing the config:\n{exception}')
+        await interaction.followup.send(config)
+        
 
     @event_group.command(name='new',
                                   description='Start a new event')
