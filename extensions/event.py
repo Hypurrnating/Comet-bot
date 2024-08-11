@@ -62,36 +62,50 @@ class event_cog(discord.ext.commands.Cog):
         return toml
 
     @app_commands.guild_only()
+    @app_commands.checks.has_permissions(create_events = True, manage_events = True)
     async def start_event_ctx(self, interaction: discord.Interaction, message: discord.Message):
         await interaction.response.defer(ephemeral=True, thinking=True)
+        
+        if not isinstance(message.author, discord.Member):
+            message.author = message.guild.get_member(message.author.id) if message.guild.get_member(message.author.id) else await message.guild.fetch_member(message.author.id)
+        if not message.author.guild_permissions.create_events:
+            await interaction.followup.send(content=f'The author of the template must have `create_events` permission.')
+            return
+        
         pattern = re.compile(r'```toml.*```', re.DOTALL)
         tomls = re.findall(pattern, message.content)
-        if not tomls:
-            await interaction.followup.send(content=f'This message either doesnt contain any templates, or isnt formatted properly.'); return
+        if not tomls or len(tomls) > 1:
+            await interaction.followup.send(content=f'Could not detect a template in this message.'); return
         toml = await self.preprocess_toml(tomls[0].replace('```toml', '').replace('```', '').strip())
         try:
             config = tomllib.loads(toml)
         except Exception as exception:
-            await interaction.followup.send(content=f'Ran into an error parsing the config:\n{exception}'); print(toml); return
+            await interaction.followup.send(content=f'Ran into an error parsing the config:\n`{exception}`\n[Tools like this one can help fix that](https://www.toml-lint.com/)')
+            return
         await interaction.followup.send(config)
 
     @app_commands.guild_only()
+    @app_commands.checks.has_permissions(manage_events=True)
     async def end_event_ctx(self, interaction: discord.Interaction, message:discord.Message):
         await interaction.response.defer(ephemeral=True, thinking=True)
 
     @app_commands.guild_only()
+    @app_commands.checks.has_permissions(manage_events=True)
     async def edit_event_ctx(self, interaction: discord.Interaction, message: discord.Message):
         await interaction.response.defer(ephemeral=True, thinking=True)
 
     @app_commands.guild_only()
+    @app_commands.checks.has_permissions(manage_events=True)
     async def lock_event_ctx(self, interaction: discord.Interaction, message: discord.Message):
         await interaction.response.defer(ephemeral=True, thinking=True)
 
     @app_commands.guild_only()
+    @app_commands.checks.has_permissions(manage_events=True)
     async def cohost_event_ctx(self, interaction: discord.Interaction, message: discord.Message):
         await interaction.response.defer(ephemeral=True, thinking=True)
 
     @app_commands.guild_only()
+    @app_commands.checks.has_permissions(manage_events=True)
     async def add_cohost_event_ctx(self, interaction: discord.Interaction, member: discord.Member):
         await interaction.response.defer(ephemeral=True, thinking=True)
 
