@@ -24,7 +24,7 @@ class Donut(discord.ext.commands.Bot):
                          command_prefix=discord.ext.commands.when_mentioned,
                          intents=intents, **options)
 
-        self.bot = self     # Lets me use both `self` and `self.bot` in functions
+        self.bot = self
         self.quart = self.QuartWeb(self)
         self.webhooks = dict()
         self.errors = self.errors()
@@ -46,8 +46,6 @@ class Donut(discord.ext.commands.Bot):
     async def on_ready(self):
         await self.tree.sync()
 
-
-    # Below are just custom functions
 
     class errors():
         def __init__(self) -> None:
