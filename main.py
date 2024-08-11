@@ -1,9 +1,7 @@
-import aiosqlite.cursor
 import discord
 import discord.ext.commands  # Doesn't generate the docs if you dont import this
 import asyncpg
 import redis
-import aiosqlite
 import logging
 import os
 import platform
