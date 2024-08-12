@@ -33,7 +33,8 @@ class Donut(discord.ext.commands.Bot):
 
         for x in pathlib.Path(f'./extensions').iterdir():
             if x.is_file():
-                asyncio.create_task(self.load_extension(f'extensions.{x.name.split(".")[0]}'))
+                if not x.name in ['starboard.py']:
+                    asyncio.create_task(self.load_extension(f'extensions.{x.name.split(".")[0]}'))
 
 
     async def create_tables(self):
@@ -74,14 +75,27 @@ class Donut(discord.ext.commands.Bot):
 
     async def grab_webhook(self, channel: discord.TextChannel) -> discord.Webhook | None:
         if not isinstance(channel, discord.TextChannel):
-            return
+            raise self.errors.WebhookError('Channel is not a text channel') 
+        webhook = None
 
-        channel_webhooks = await channel.webhooks()
-        for webhook in channel_webhooks:
-            if await self.is_bot_webhook(webhook):
-                return webhook
+        async with self.bot.psql.acquire() as connection:
+            resp = await connection.fetch(f'SELECT * FROM channel_webhooks WHERE channel_id = $1', int(channel.id))
+        if resp:
+            webhook = discord.Webhook.from_url(resp['url'])
+            try:
+                await webhook.fetch()
+            except discord.NotFound:
+                webhook = None
+            if not self.is_bot_webhook(webhook):    # Kinda useless line but oh well
+                async with self.bot.psql.acquire() as connection:
+                    await connection.execute(f'DELETE FROM channel_webhooks WHERE channel_id = $1', int(channel.id))
+        
+        if webhook == None:
+            webhook = await channel.create_webhook(name=self.user.name, avatar=await self.user.avatar.read())
+            async with self.bot.psql.acquire() as connection:
+                await connection.execute(f'INSERT INTO channel_webhooks(channel_id, url)', int(channel.id), str(webhook.url))
 
-        return await channel.create_webhook(name=self.user.name, avatar=await self.user.avatar.read())
+        return webhook
 
     async def progress_bar(self, percent: int) -> str:
         if percent > 100:
