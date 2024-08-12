@@ -38,6 +38,7 @@ class Donut(discord.ext.commands.Bot):
 
 
     async def create_tables(self):
+        # CREATE TABLE IF NOT EXISTS channel_webhooks(id SERIAL PRIMARY KEY, channel_id BIGINT, url VARCHAR(1500))
         await (await self.sqlite.cursor()).execute('CREATE TABLE IF NOT EXISTS channel_webhooks(id INTEGER PRIMARY KEY AUTOINCREMENT, channel_id BIGINT, url VARCHAR(1500))')
         await (await self.sqlite.cursor()).execute('CREATE TABLE IF NOT EXISTS guild_starboards(id INTEGER PRIMARY KEY AUTOINCREMENT, guild_id BIGINT, channel_id BIGINT, added_by BIGINT)')
         await (await self.sqlite.cursor()).execute('CREATE TABLE IF NOT EXISTS stars(id INTEGER PRIMARY KEY AUTOINCREMENT, guild_id BIGINT, channel_id BIGINT, message_id BIGINT, user_id BIGINT)')
@@ -79,21 +80,22 @@ class Donut(discord.ext.commands.Bot):
         webhook = None
 
         async with self.bot.psql.acquire() as connection:
-            resp = await connection.fetch(f'SELECT * FROM channel_webhooks WHERE channel_id = $1', int(channel.id))
+            resp = await connection.fetchrow(f'SELECT * FROM channel_webhooks WHERE channel_id = $1', int(channel.id))
         if resp:
-            webhook = discord.Webhook.from_url(resp['url'])
+            webhook = discord.Webhook.from_url(resp['url'], client=self.bot)
             try:
                 await webhook.fetch()
             except discord.NotFound:
                 webhook = None
-            if not self.is_bot_webhook(webhook):    # Kinda useless line but oh well
+            if not await self.is_bot_webhook(webhook):    # Kinda useless line but oh well
                 async with self.bot.psql.acquire() as connection:
                     await connection.execute(f'DELETE FROM channel_webhooks WHERE channel_id = $1', int(channel.id))
         
         if webhook == None:
+            # should include a part that checks the channel webhooks to be double sure
             webhook = await channel.create_webhook(name=self.user.name, avatar=await self.user.avatar.read())
             async with self.bot.psql.acquire() as connection:
-                await connection.execute(f'INSERT INTO channel_webhooks(channel_id, url)', int(channel.id), str(webhook.url))
+                await connection.execute(f'INSERT INTO channel_webhooks(channel_id, url) VALUES ($1, $2)', int(channel.id), str(webhook.url))
 
         return webhook
 
@@ -157,4 +159,5 @@ async def main():
         bot.redis = _redis
         tasks = [bot.quart.run(), bot.start(os.environ.get('TOKEN'))]
         await asyncio.gather(*tasks)
-asyncio.run(main())
+if __name__ == '__main__':
+    asyncio.run(main())
