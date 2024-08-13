@@ -8,6 +8,7 @@ import platform
 import pathlib
 import asyncio
 import typing
+import traceback
 from multiprocessing.connection import Listener
 from datetime import datetime
 from dotenv import load_dotenv
@@ -27,6 +28,7 @@ class Donut(discord.ext.commands.Bot):
         self.bot = self
         self.quart = self.QuartWeb(self)
         self.webhooks = dict()
+        self.tree.on_error = self._on_tree_error
         self.errors = self.errors()
         discord.utils.setup_logging(level=logging.INFO)
         logging.getLogger('discord.gateway').setLevel(30)   # Stops a flood of "gate RESUMED" messages      
@@ -48,6 +50,10 @@ class Donut(discord.ext.commands.Bot):
     async def on_ready(self):
         await self.tree.sync()
 
+    async def _on_tree_error(self, interaction: discord.Interaction, error: discord.app_commands.AppCommandError):
+        await interaction.followup.send(f'Ran into an error :/\n```{error}```', ephemeral=True)
+        traceback.print_exception(error)
+        logging.error(error)
 
     class errors():
         def __init__(self) -> None:
