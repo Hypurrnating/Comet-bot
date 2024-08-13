@@ -63,6 +63,9 @@ class Donut(discord.ext.commands.Bot):
                 pass
             self.WebhookError = WebhookError    
 
+    async def get_event(self, event_id: int):
+        pass
+
     async def is_bot_webhook(self, webhook: discord.Webhook) -> bool:
         """Check if the webhook is created by THIS bot
 
