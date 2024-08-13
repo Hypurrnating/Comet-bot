@@ -9,15 +9,22 @@ import urllib
 import urllib.parse
 import re
 import tomllib
+import sys
+import os
+import datetime
+import sorcery
+from sorcery import dict_of
 
+sys.path.insert(0, '..')
+import main as donut
 from discord.utils import MISSING
 
 class event_cog(discord.ext.commands.Cog):
-    def __init__(self, bot: discord.ext.commands.Bot) -> None:
+    def __init__(self, bot: donut.Donut) -> None:
         self.bot = bot
         super().__init__()
         self.bot.tree.add_command(app_commands.ContextMenu(
-            name='Start from message', callback=self.start_event_ctx))
+            name='Create from message', callback=self.create_event_ctx))
         self.bot.tree.add_command(app_commands.ContextMenu(
             name='End this event', callback=self.end_event_ctx))
         self.bot.tree.add_command(app_commands.ContextMenu(
@@ -25,11 +32,84 @@ class event_cog(discord.ext.commands.Cog):
         self.bot.tree.add_command(app_commands.ContextMenu(
             name='Lock this event', callback=self.lock_event_ctx))
         self.bot.tree.add_command(app_commands.ContextMenu(
-            name='Co-host this event', callback=self.cohost_event_ctx))
+            name='Start this event', callback=self.start_event_ctx))
         self.bot.tree.add_command(app_commands.ContextMenu(
             name='Add as co-host to event', callback=self.add_cohost_event_ctx))
 
     event_group = discord.app_commands.Group(name='event', description='Commands that help you manage sessions')
+
+    class _event_vote_view(discord.ui.View):
+        def __init__(self, *, event_id: int, timeout=None):
+            self.event_id = event_id
+            super().__init__(timeout=timeout)
+        
+        @discord.ui.button(label='I\'m interested', style=discord.ButtonStyle.green)
+        async def _yeah(self, interaction: discord.Interaction, button: discord.ui.Button):
+            await interaction.response.defer()
+            event = await interaction.client.get_event(self.event_id)
+            event['interested'][interaction.user.id] = dict(name = interaction.user.display_name,
+                                                            username = interaction.user.global_name,
+                                                            avatar_url = interaction.user.display_avatar.url)
+        
+        @discord.ui.button(label='Information', style=discord.ButtonStyle.gray)
+        async def _what(self, interaction: discord.Interaction, button: discord.ui.Button):
+            await interaction.response.defer(ephemeral=True, thinking=True)
+            event = await interaction.client.get_event(self.event_id)
+            msg = f"This is an event hosted by the server (using {interaction.client.user.mention}). "\
+            "If you are interested in this event, you can press the button on the left and wait for it start. "\
+            "Sometimes event managers might be waiting for enough people to become interested before starting. "\
+            "Pressing that button will help them choose whether they should start the event or not. " + "\n\n" + self.event_id['FAQ']['information']
+            await interaction.followup.send(content=msg,
+                                            username=self.event_id['Webhook']['webhook_name'] or interaction.guild.name,
+                                            avatar_url=self.event_id['Webhook']['webhook_avatar_url'] or interaction.guild.icon.url)
+
+
+    class _create_event_param_view(discord.ui.View):
+        def __init__(self, *, modal: discord.ui.Modal, timeout=None):
+            self.modal = modal
+            super().__init__(timeout=timeout)
+
+        @discord.ui.button(label='Fill parameters', style=discord.ButtonStyle.blurple)
+        async def _button(self, interaction: discord.Interaction, button: discord.ui.Button):
+            await interaction.response.send_modal(self.modal)
+            await self.modal.wait()
+            self.resp = self.modal.children
+            self.stop()
+
+
+    async def _create_event(self, interaction: discord.Interaction, config: dict):
+        channel = interaction.guild.get_channel(config['Webhook']['event_channel_id']) or await interaction.guild.fetch_channel(config['Webhook']['event_channel_id'])
+        webhook = await self.bot.grab_webhook(channel)
+
+        if config.get('Parameters'):
+            modal = discord.ui.Modal(title='Fill parameters', timeout=None)
+            for param in config['Parameters'].keys():
+                modal.add_item(discord.ui.TextInput(label=param,
+                                                    placeholder=config['Parameters'][param]['hint'],
+                                                    required=config['Parameters'][param]['required'],
+                                                    style=discord.TextStyle.long))
+                async def _on_submit(interaction: discord.Interaction):
+                    await interaction.response.defer()
+                modal.on_submit = _on_submit
+            view = self._create_event_param_view(modal=modal)
+        msg: discord.WebhookMessage = await interaction.followup.send(f'', view=view)
+        await view.wait()
+        await msg.edit(content=f'Thanks', view=None)
+        params = view.resp
+
+        embed = discord.Embed(title=config['Configuration']['title'],
+                              description=config['Configuration']['description'])
+        for param in params:
+            embed.add_field(name=param.label, value=param.value)
+
+        view = self._event_vote_view(event_id=config)
+        
+        await webhook.send(content=f'-# Event Announcement',
+                           embed=embed,
+                           view=view,
+                           username=config['Webhook']['webhook_name'] or interaction.guild.name,
+                           avatar_url=config['Webhook']['webhook_avatar_url'] or interaction.guild.icon.url)
+        await msg.edit(content=f'Announced!', view=None)
 
     async def preprocess_toml(self, toml: str) -> str:
         # Process titles
@@ -58,12 +138,11 @@ class event_cog(discord.ext.commands.Cog):
             _bool = re.search(pattern, bool).group()
             bool_ = pattern.sub(_bool.lower(), bool)
             toml = toml.replace(bool, bool_)
-        print(toml)
         return toml
 
     @app_commands.guild_only()
     @app_commands.checks.has_permissions(create_events = True, manage_events = True)
-    async def start_event_ctx(self, interaction: discord.Interaction, message: discord.Message):
+    async def create_event_ctx(self, interaction: discord.Interaction, message: discord.Message):
         await interaction.response.defer(ephemeral=True, thinking=True)
         
         if not isinstance(message.author, discord.Member):
@@ -82,7 +161,7 @@ class event_cog(discord.ext.commands.Cog):
         except Exception as exception:
             await interaction.followup.send(content=f'Ran into an error parsing the config:\n`{exception}`\n[Tools like this one can help fix that](https://www.toml-lint.com/)')
             return
-        await interaction.followup.send(config)
+        await self._create_event(interaction, config)
 
     @app_commands.guild_only()
     @app_commands.checks.has_permissions(manage_events=True)
@@ -101,7 +180,7 @@ class event_cog(discord.ext.commands.Cog):
 
     @app_commands.guild_only()
     @app_commands.checks.has_permissions(manage_events=True)
-    async def cohost_event_ctx(self, interaction: discord.Interaction, message: discord.Message):
+    async def start_event_ctx(self, interaction: discord.Interaction, message: discord.Message):
         await interaction.response.defer(ephemeral=True, thinking=True)
 
     @app_commands.guild_only()
