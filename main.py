@@ -9,11 +9,14 @@ import pathlib
 import asyncio
 import typing
 import traceback
+import json
 from multiprocessing.connection import Listener
 from datetime import datetime
 from dotenv import load_dotenv
 import quart
 from quart import Quart, Response, jsonify, request, session, redirect, url_for, render_template, render_template_string, Markup, websocket
+import redis.client
+import redis.connection
 
 load_dotenv()
 
@@ -30,6 +33,8 @@ class Donut(discord.ext.commands.Bot):
         self.webhooks = dict()
         self.tree.on_error = self._on_tree_error
         self.errors = self.errors()
+        self.redis: redis.client.Redis = None
+        self.psql: asyncpg.Pool = None
         discord.utils.setup_logging(level=logging.INFO)
         logging.getLogger('discord.gateway').setLevel(30)   # Stops a flood of "gate RESUMED" messages      
 
@@ -37,6 +42,7 @@ class Donut(discord.ext.commands.Bot):
             if x.is_file():
                 if not x.name in ['starboard.py']:
                     asyncio.create_task(self.load_extension(f'extensions.{x.name.split(".")[0]}'))
+        asyncio.create_task(self.load_extension('jishaku'))
 
 
     async def create_tables(self):
@@ -57,14 +63,31 @@ class Donut(discord.ext.commands.Bot):
 
     class errors():
         def __init__(self) -> None:
+            pass
             
-            class WebhookError(Exception):
-                """Exception for whenever there is an error relating managing webhooks"""
-                pass
-            self.WebhookError = WebhookError    
+        class WebhookError(discord.DiscordException):
+            """Exception for whenever there is an error relating managing webhooks"""
+            pass
+
+        class EventError(discord.DiscordException):
+            """ """
+            pass
+              
+
+    async def set_event(self, event: dict):
+        events = json.dumps(event)
+        self.redis.set(f'event_{event['id']}', events)
 
     async def get_event(self, event_id: int):
-        pass
+        resp = self.redis.get(f'event_{event_id}')
+        try:
+            event = json.loads(resp)
+        except:
+            return None
+        return event
+
+    async def del_event(self, event_id: int):
+        self.redis.delete(event_id)
 
     async def is_bot_webhook(self, webhook: discord.Webhook) -> bool:
         """Check if the webhook is created by THIS bot
