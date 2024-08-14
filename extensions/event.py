@@ -59,18 +59,18 @@ class event_cog(discord.ext.commands.Cog):
             msg = f"This is an event hosted by the server (using {interaction.client.user.mention}). "\
             "If you are interested in this event, you can press the button on the left and wait for it start. "\
             "Sometimes event managers might be waiting for enough people to become interested before starting. "\
-            "Pressing that button will help them choose whether they should start the event or not. " + "\n\n" + self.event_id['FAQ']['information']
+            "Pressing that button will help them choose whether they should start the event or not. " + "\n\n" + event['FAQ']['information']
 
             view = discord.ui.View(timeout=None)
-            for butt in self.event_id['FAQ']['buttons'].keys():
+            for butt in event['FAQ']['buttons'].keys():
                 button = discord.ui.Button(label=butt,
                                            style = discord.ButtonStyle.url,
-                                           url=self.event_id['FAQ']['buttons'][butt])
+                                           url=event['FAQ']['buttons'][butt])
                 view.add_item(button)
             await interaction.followup.send(content=msg,
                                             view=view,
-                                            username=self.event_id['Webhook']['webhook_name'] or interaction.guild.name,
-                                            avatar_url=self.event_id['Webhook']['webhook_avatar_url'] or interaction.guild.icon.url)
+                                            username=event['Webhook']['webhook_name'] or interaction.guild.name,
+                                            avatar_url=event['Webhook']['webhook_avatar_url'] or interaction.guild.icon.url)
 
 
     class _create_event_param_view(discord.ui.View):
@@ -89,6 +89,8 @@ class event_cog(discord.ext.commands.Cog):
     async def _create_event(self, interaction: discord.Interaction, config: dict):
         channel = interaction.guild.get_channel(config['Webhook']['event_channel_id']) or await interaction.guild.fetch_channel(config['Webhook']['event_channel_id'])
         webhook = await self.bot.grab_webhook(channel)
+        config['id'] = interaction.id
+        config['interested'] = dict()
 
         if config.get('Parameters'):
             modal = discord.ui.Modal(title='Fill parameters', timeout=None)
@@ -103,7 +105,7 @@ class event_cog(discord.ext.commands.Cog):
             view = self._create_event_param_view(modal=modal)
         msg: discord.WebhookMessage = await interaction.followup.send(f'', view=view)
         await view.wait()
-        await msg.edit(content=f'Thanks', view=None)
+        await msg.edit(content='<a:HourGlass:1273332047276150826>', view=None)
         params = view.resp
 
         embed = discord.Embed(title=config['Configuration']['title'],
@@ -111,8 +113,9 @@ class event_cog(discord.ext.commands.Cog):
         for param in params:
             embed.add_field(name=param.label, value=param.value)
 
-        view = self._event_vote_view(event_id=config, information_label=config['FAQ']['label'])
-        
+        view = self._event_vote_view(event_id=config['id'], information_label=config['FAQ']['label'])
+
+        await self.bot.set_event(config)
         await webhook.send(content=f'-# Event Announcement',
                            embed=embed,
                            view=view,
