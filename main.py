@@ -98,12 +98,16 @@ class Donut(discord.ext.commands.Bot):
                 webhook = None
                 async with self.bot.psql.acquire() as connection:
                     await connection.execute(f'DELETE FROM channel_webhooks WHERE channel_id = $1', int(channel.id))
+        if webhook:
             if not await self.is_bot_webhook(webhook):    # Kinda useless line but oh well
                 async with self.bot.psql.acquire() as connection:
                     await connection.execute(f'DELETE FROM channel_webhooks WHERE channel_id = $1', int(channel.id))
         
-        if webhook == None:
-            # should include a part that checks the channel webhooks to be double sure
+        if not webhook:
+            for webhook in await channel.webhooks():
+                if await self.is_bot_webhook(webhook):
+                    webhook = webhook
+        if not webhook:
             webhook = await channel.create_webhook(name=self.user.name, avatar=await self.user.avatar.read())
             async with self.bot.psql.acquire() as connection:
                 await connection.execute(f'INSERT INTO channel_webhooks(channel_id, url) VALUES ($1, $2)', int(channel.id), str(webhook.url))
