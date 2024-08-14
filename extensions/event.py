@@ -39,9 +39,10 @@ class event_cog(discord.ext.commands.Cog):
     event_group = discord.app_commands.Group(name='event', description='Commands that help you manage sessions')
 
     class _event_vote_view(discord.ui.View):
-        def __init__(self, *, event_id: int, timeout=None):
+        def __init__(self, *, event_id: int, information_label: str = 'Information', timeout=None):
             self.event_id = event_id
             super().__init__(timeout=timeout)
+            [x for x in self.children if x.label == 'Information'][0].label = information_label
         
         @discord.ui.button(label='I\'m interested', style=discord.ButtonStyle.green)
         async def _yeah(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -51,15 +52,23 @@ class event_cog(discord.ext.commands.Cog):
                                                             username = interaction.user.global_name,
                                                             avatar_url = interaction.user.display_avatar.url)
         
-        @discord.ui.button(label='Information', style=discord.ButtonStyle.gray)
-        async def _what(self, interaction: discord.Interaction, button: discord.ui.Button):
+        @discord.ui.button(label='Information', style=discord.ButtonStyle.gray)  # Label is handled by init
+        async def information(self, interaction: discord.Interaction, button: discord.ui.Button):
             await interaction.response.defer(ephemeral=True, thinking=True)
             event = await interaction.client.get_event(self.event_id)
             msg = f"This is an event hosted by the server (using {interaction.client.user.mention}). "\
             "If you are interested in this event, you can press the button on the left and wait for it start. "\
             "Sometimes event managers might be waiting for enough people to become interested before starting. "\
             "Pressing that button will help them choose whether they should start the event or not. " + "\n\n" + self.event_id['FAQ']['information']
+
+            view = discord.ui.View(timeout=None)
+            for butt in self.event_id['FAQ']['buttons'].keys():
+                button = discord.ui.Button(label=butt,
+                                           style = discord.ButtonStyle.url,
+                                           url=self.event_id['FAQ']['buttons'][butt])
+                view.add_item(button)
             await interaction.followup.send(content=msg,
+                                            view=view,
                                             username=self.event_id['Webhook']['webhook_name'] or interaction.guild.name,
                                             avatar_url=self.event_id['Webhook']['webhook_avatar_url'] or interaction.guild.icon.url)
 
@@ -102,7 +111,7 @@ class event_cog(discord.ext.commands.Cog):
         for param in params:
             embed.add_field(name=param.label, value=param.value)
 
-        view = self._event_vote_view(event_id=config)
+        view = self._event_vote_view(event_id=config, information_label=config['FAQ']['label'])
         
         await webhook.send(content=f'-# Event Announcement',
                            embed=embed,
