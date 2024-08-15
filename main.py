@@ -75,11 +75,11 @@ class Donut(discord.ext.commands.Bot):
             pass
               
 
-    async def set_event(self, event: dict):
+    async def set_event(self, event: dict) -> None:
         events = json.dumps(event)
         self.redis.hset(name='events', key=f'event_{event['id']}', value=events)
 
-    async def get_event(self, event_id: int):
+    async def get_event(self, event_id: int) -> dict | None:
         resp = self.redis.hget(name='events', key=f'event_{event_id}')
         try:
             event = json.loads(resp)
@@ -87,9 +87,35 @@ class Donut(discord.ext.commands.Bot):
             return None
         return event
 
-    async def del_event(self, event_id: int):
+    async def clear_event(self, event_id: int) -> None:
+        event = self.get_event(event_id)
         self.redis.hdel('events', event_id)
+        self.redis.delete(f'interested_{event_id}')
+        self.redis.delete(f'attendees_{event_id}')
 
+        webhook: discord.Webhook = await self.bot.grab_webhook(event['Webhook']['event_channel_id '])
+        message = await webhook.fetch_message(event['announcement'])
+        await message.delete()
+
+    async def add_interested(self, event_id: int, user_id: int, user_data: dict) -> None:
+        self.redis.hset(f'interested_{event_id}', user_id, json.loads(user_data))
+
+    async def get_interested(self, event_id: id) -> dict | None:
+        resp = self.redis.hgetall(f'interested_{event_id}')
+        interested = dict()
+        for key, value in resp.items():
+            interested[key] = json.loads(value)
+        return interested
+    
+    async def add_attendee(self, event_id: int, user_id: int, user_data: dict) -> None:
+        self.redis.hset(f'attendees_{event_id}', user_id, user_data)
+
+    async def get_attendees(self, event_id: id) -> dict | None:
+        resp = self.redis.hgetall(f'attendees_{event_id}')
+        attendees = dict()
+        for key, value in resp.items():
+            attendees[key] = json.loads(value)
+        return attendees
 
     async def is_bot_webhook(self, webhook: discord.Webhook) -> bool:
         """Check if the webhook is created by THIS bot
@@ -131,6 +157,7 @@ class Donut(discord.ext.commands.Bot):
         if not webhook:
             for webhook in await channel.webhooks():
                 if await self.is_bot_webhook(webhook):
+                    # TODO: Store in pg db
                     webhook = webhook
         if not webhook:
             webhook = await channel.create_webhook(name=self.user.name, avatar=await self.user.avatar.read())
