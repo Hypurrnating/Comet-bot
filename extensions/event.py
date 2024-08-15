@@ -12,6 +12,7 @@ import tomllib
 import sys
 import os
 import datetime
+import json
 import sorcery
 from sorcery import dict_of
 
@@ -35,25 +36,32 @@ class event_cog(discord.ext.commands.Cog):
             name='Start this event', callback=self.start_event_ctx))
         self.bot.tree.add_command(app_commands.ContextMenu(
             name='Add as co-host to event', callback=self.add_cohost_event_ctx))
+        
+        for event in bot.redis.hgetall('events').values():
+            event = json.loads(event)
+            view = self._event_announcement_view(event_id=event['id'])
+            bot.add_view(view)
 
     event_group = discord.app_commands.Group(name='event', description='Commands that help you manage sessions')
 
-    class _event_vote_view(discord.ui.View):
+
+    class _event_announcement_view(discord.ui.View):
         def __init__(self, *, event_id: int, information_label: str = 'Information', timeout=None):
             self.event_id = event_id
             super().__init__(timeout=timeout)
-            [x for x in self.children if x.label == 'Information'][0].label = information_label
+            self.information.label = information_label
+            self.information.custom_id = self.information.custom_id + f'_{event_id}'
         
-        @discord.ui.button(label='I\'m interested', style=discord.ButtonStyle.green)
-        async def _yeah(self, interaction: discord.Interaction, button: discord.ui.Button):
+        @discord.ui.button(label='I\'m interested', style=discord.ButtonStyle.green, custom_id='action')
+        async def action(self, interaction: discord.Interaction, button: discord.ui.Button):
             await interaction.response.defer()
             event = await interaction.client.get_event(self.event_id)
             event['interested'][interaction.user.id] = dict(name = interaction.user.display_name,
                                                             username = interaction.user.global_name,
                                                             avatar_url = interaction.user.display_avatar.url)
         
-        @discord.ui.button(label='Information', style=discord.ButtonStyle.gray)  # Label is handled by init
-        async def information(self, interaction: discord.Interaction, button: discord.ui.Button):
+        @discord.ui.button(style=discord.ButtonStyle.gray)  # Label is handled by init
+        async def information(self, interaction: discord.Interaction, button: discord.ui.Button, custom_id = 'information'):
             await interaction.response.defer(ephemeral=True, thinking=True)
             event = await interaction.client.get_event(self.event_id)
             msg = f"This is an event hosted by the server (using {interaction.client.user.mention}). "\
@@ -74,16 +82,65 @@ class event_cog(discord.ext.commands.Cog):
 
 
     class _create_event_param_view(discord.ui.View):
-        def __init__(self, *, modal: discord.ui.Modal, timeout=None):
-            self.modal = modal
+        def __init__(self, *, config: dict = None, timeout=None):
+            self.message = None
+            self.config = config
+            
+            self.param_resp = None
+            self.url_resp = None
             super().__init__(timeout=timeout)
+            if not  self.config.get('Parameters'):
+                self.params.disabled = True
+                self.params.style = discord.ButtonStyle.gray
+                self.param_resp = True
+
+        @discord.ui.button(label='Enter Event URL', style=discord.ButtonStyle.blurple)
+        async def url(self, interaction: discord.Interaction, button: discord.ui.Button):
+            # Create modal 
+            modal = discord.ui.Modal(title='Enter Event URL', timeout=None)
+            modal.add_item(discord.ui.TextInput(label='URL', 
+                                                style=discord.TextStyle.long, 
+                                                required=True))
+            async def _on_submit(interaction: discord.Interaction):
+                await interaction.response.defer()
+            modal.on_submit = _on_submit
+
+            await interaction.response.send_modal(modal)
+            await modal.wait()
+            self.url_resp = modal.children[0].value
+            if not validators.url(self.url_resp):
+                button.style = discord.ButtonStyle.red
+                self.url_resp = None
+            else:
+                button.style = discord.ButtonStyle.gray
+            if self.url_resp and self.param_resp:
+                self.stop()
+                return
+            await self.message.edit(view=self)
 
         @discord.ui.button(label='Fill parameters', style=discord.ButtonStyle.blurple)
-        async def _button(self, interaction: discord.Interaction, button: discord.ui.Button):
-            await interaction.response.send_modal(self.modal)
-            await self.modal.wait()
-            self.resp = self.modal.children
-            self.stop()
+        async def params(self, interaction: discord.Interaction, button: discord.ui.Button):
+            # Create modal
+            modal = discord.ui.Modal(title='Fill parameters', timeout=None)
+            for param in self.config['Parameters'].keys():
+                modal.add_item(discord.ui.TextInput(label=param,
+                                                    placeholder=self.config['Parameters'][param]['hint'],
+                                                    required=self.config['Parameters'][param]['required'],
+                                                    style=discord.TextStyle.long))
+                async def _on_submit(interaction: discord.Interaction):
+                    await interaction.response.defer()
+                modal.on_submit = _on_submit
+
+            await interaction.response.send_modal(modal)
+            await modal.wait()
+            self.param_resp = dict()
+            for child in modal.children:
+                self.param_resp[child.label] = child.value
+            button.style = discord.ButtonStyle.gray
+            if self.url_resp and self.param_resp:
+                self.stop()
+                return
+            await self.message.edit(view=self)
 
 
     async def _create_event(self, interaction: discord.Interaction, config: dict):
@@ -92,36 +149,37 @@ class event_cog(discord.ext.commands.Cog):
         config['id'] = interaction.id
         config['interested'] = dict()
 
-        if config.get('Parameters'):
-            modal = discord.ui.Modal(title='Fill parameters', timeout=None)
-            for param in config['Parameters'].keys():
-                modal.add_item(discord.ui.TextInput(label=param,
-                                                    placeholder=config['Parameters'][param]['hint'],
-                                                    required=config['Parameters'][param]['required'],
-                                                    style=discord.TextStyle.long))
-                async def _on_submit(interaction: discord.Interaction):
-                    await interaction.response.defer()
-                modal.on_submit = _on_submit
-            view = self._create_event_param_view(modal=modal)
+        view = self._create_event_param_view(config=config)
         msg: discord.WebhookMessage = await interaction.followup.send(f'', view=view)
+        view.message = msg
         await view.wait()
         await msg.edit(content='<a:HourGlass:1273332047276150826>', view=None)
-        params = view.resp
+        config['params'] = view.param_resp
+        config['join_url'] = view.url_resp
 
         embed = discord.Embed(title=config['Configuration']['title'],
                               description=config['Configuration']['description'])
-        for param in params:
-            embed.add_field(name=param.label, value=param.value)
+        if config.get('Parameters'):
+            for param in config['params'].keys():
+                embed.add_field(name=param, value=config['params'][param])
+        embed.set_footer(text=config['id'])
 
-        view = self._event_vote_view(event_id=config['id'], information_label=config['FAQ']['label'])
+        view = self._event_announcement_view(event_id=config['id'], information_label=config['FAQ']['label'])
 
-        await self.bot.set_event(config)
-        await webhook.send(content=f'-# Event Announcement',
-                           embed=embed,
-                           view=view,
-                           username=config['Webhook']['webhook_name'] or interaction.guild.name,
-                           avatar_url=config['Webhook']['webhook_avatar_url'] or interaction.guild.icon.url)
+        announcement = await webhook.send(content=f'-# Event Announcement', 
+                                          embed=embed,
+                                          view=view,
+                                          wait=True,
+                                          username=config['Webhook']['webhook_name'] or interaction.guild.name,
+                                          avatar_url=config['Webhook']['webhook_avatar_url'] or interaction.guild.icon.url)
+        config['announcement'] = announcement.id
+        try:
+            await self.bot.set_event(config)
+        except Exception as exception:
+            await announcement.delete()
+            raise exception
         await msg.edit(content=f'Announced!', view=None)
+
 
     async def preprocess_toml(self, toml: str) -> str:
         # Process titles
@@ -194,6 +252,24 @@ class event_cog(discord.ext.commands.Cog):
     @app_commands.checks.has_permissions(manage_events=True)
     async def start_event_ctx(self, interaction: discord.Interaction, message: discord.Message):
         await interaction.response.defer(ephemeral=True, thinking=True)
+        #if (not message.author == self.bot.user.id) or (not message.embeds):
+        #    await interaction.followup.send(f'This is not a {self.bot.user.mention} event.')
+        #    return
+        
+        event = await interaction.client.get_event(message.embeds[0].footer.text)
+        if not type(event) == dict: # idfk what redispy returns on fail
+            await interaction.followup.send(f'This is an invalid event (i.e. expired).')
+            return
+        
+        view = discord.ui.View.from_message(message)
+        action_button: discord.ui.Button = [button for button in view.children if button.custom_id == 'action'][0]
+        action_button.label = 'Join Event'
+        action_button.style = discord.ButtonStyle.url
+        action_button.custom_id = None
+        action_button.url = event['join_url']
+        webhook = await self.bot.grab_webhook(message.channel)
+        await webhook.edit_message(message_id=message.id, view=view)
+
 
     @app_commands.guild_only()
     @app_commands.checks.has_permissions(manage_events=True)
@@ -242,5 +318,5 @@ class event_cog(discord.ext.commands.Cog):
 
 
 
-async def setup(bot):
+async def setup(bot: donut.Donut):
     await bot.add_cog(event_cog(bot))
