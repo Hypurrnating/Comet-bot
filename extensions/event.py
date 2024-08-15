@@ -162,17 +162,20 @@ class event_cog(discord.ext.commands.Cog):
         if config.get('Parameters'):
             for param in config['params'].keys():
                 embed.add_field(name=param, value=config['params'][param])
-
-        view = self._event_announcement_view(event_id=config['id'], information_label=config['FAQ']['label'])
-
-        announcement = await webhook.send(content=f'-# Event Announcement', 
-                                          embed=embed,
-                                          view=view,
+        
+        # We send the announcement message without the embed/view at first because we need to set the message id and event id
+        announcement = await webhook.send(content=f'-# Event Announcement',
                                           wait=True,
                                           username=config['Webhook']['webhook_name'] or interaction.guild.name,
                                           avatar_url=config['Webhook']['webhook_avatar_url'] or interaction.guild.icon.url)
         config['announcement'] = announcement.id
         config['id'] = announcement.id
+
+        view = self._event_announcement_view(event_id=config['id'], information_label=config['FAQ']['label'])
+
+        announcement = await webhook.edit_message(announcement.id,
+                                                  embed=embed,
+                                                  view=view)
         try:
             await self.bot.set_event(config)
         except Exception as exception:
@@ -261,7 +264,7 @@ class event_cog(discord.ext.commands.Cog):
             await interaction.followup.send(f'This is an invalid event (i.e. expired).')
             return
         
-        view = self._event_announcement_view(event_id=event['id'])
+        view = self._event_announcement_view(event_id=event['id'], information_label=event['FAQ']['label'])
         action_button: discord.ui.Button = [button for button in view.children if button.custom_id == f'action_{event['id']}'][0]
         action_button.label = 'Join Event'
         action_button.style = discord.ButtonStyle.url
@@ -269,6 +272,7 @@ class event_cog(discord.ext.commands.Cog):
         action_button.url = event['join_url']
         webhook = await self.bot.grab_webhook(message.channel)
         await webhook.edit_message(message_id=message.id, view=view)
+        await interaction.followup.send(f'Started')
 
 
     @app_commands.guild_only()
