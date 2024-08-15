@@ -39,15 +39,17 @@ class event_cog(discord.ext.commands.Cog):
         
         for event in bot.redis.hgetall('events').values():
             event = json.loads(event)
-            view = self._event_announcement_view(event_id=event['id']) # Information label is not needed here because this is just for persistance and adding callback.
+            view = self._event_announcement_view(client=self.bot, event_id=event['id']) # Information label is not needed here because this is just for persistance and adding callback.
             bot.add_view(view)
 
     event_group = discord.app_commands.Group(name='event', description='Commands that help you manage sessions')
 
+    # TODO: Garbage collector for events that timeouts views/expires events if inactive and also if announcement message was deleted
 
     class _event_announcement_view(discord.ui.View):
-        def __init__(self, *, event_id: int, information_label: str = 'Information', timeout=None):
+        def __init__(self, *, client: donut.Donut, event_id: int, information_label: str = 'Information', timeout=None):
             self.event_id = event_id
+            self.bot = client
             super().__init__(timeout=timeout)
             self.information.label = information_label
             self.information.custom_id = self.information.custom_id + f'_{event_id}'
@@ -56,10 +58,11 @@ class event_cog(discord.ext.commands.Cog):
         @discord.ui.button(label='I\'m interested', style=discord.ButtonStyle.green, custom_id='action')
         async def action(self, interaction: discord.Interaction, button: discord.ui.Button):
             await interaction.response.defer()
-            event = await interaction.client.get_event(self.event_id)
-            event['interested'][interaction.user.id] = dict(name = interaction.user.display_name,
-                                                            username = interaction.user.global_name,
-                                                            avatar_url = interaction.user.display_avatar.url)
+            user_id = interaction.user.id
+            user_data = dict(name=interaction.user.display_name,
+                             username=interaction.user.global_name,
+                             avatar_url=interaction.user.display_avatar.url)
+            await interaction.client.add_interested(self.event_id, user_id, user_data)
         
         @discord.ui.button(style=discord.ButtonStyle.gray, custom_id = 'information')  # Label is handled by init
         async def information(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -80,6 +83,14 @@ class event_cog(discord.ext.commands.Cog):
                                             view=view,
                                             username=event['Webhook']['webhook_name'] or interaction.guild.name,
                                             avatar_url=event['Webhook']['webhook_avatar_url'] or interaction.guild.icon.url)
+        
+        async def on_timeout(self) -> None:
+            event = await self.bot.get_event(self.event_id)
+            await self.bot.clear_event(self.event_id)
+            channel = self.bot.get_channel(event['channel_id']) or await self.bot.fetch_channel(event['channel_id'])
+            message = channel.get_partial_message(event['announcement_id']) or await channel.fetch_message(event['announcement_id'])
+            await message.delete()
+            # TODO: Log event on timeout
 
 
     class _create_event_param_view(discord.ui.View):
@@ -168,10 +179,12 @@ class event_cog(discord.ext.commands.Cog):
                                           wait=True,
                                           username=config['Webhook']['webhook_name'] or interaction.guild.name,
                                           avatar_url=config['Webhook']['webhook_avatar_url'] or interaction.guild.icon.url)
-        config['announcement'] = announcement.id
+        config['guild_id'] = interaction.guild_id
+        config['channel_id'] = interaction.channel_id
+        config['announcement_id'] = announcement.id
         config['id'] = announcement.id
 
-        view = self._event_announcement_view(event_id=config['id'], information_label=config['FAQ']['label'])
+        view = self._event_announcement_view(client=self.bot, event_id=config['id'], information_label=config['FAQ']['label'])
 
         announcement = await webhook.edit_message(announcement.id,
                                                   embed=embed,
@@ -181,7 +194,7 @@ class event_cog(discord.ext.commands.Cog):
         except Exception as exception:
             await announcement.delete()
             raise exception
-        await msg.edit(content=f'Announced!', view=None)
+        await msg.edit(content=f'Announced! {announcement.jump_url}', view=None)
 
 
     async def preprocess_toml(self, toml: str) -> str:
@@ -238,8 +251,17 @@ class event_cog(discord.ext.commands.Cog):
 
     @app_commands.guild_only()
     @app_commands.checks.has_permissions(manage_events=True)
-    async def end_event_ctx(self, interaction: discord.Interaction, message:discord.Message):
+    async def end_event_ctx(self, interaction: discord.Interaction, message: discord.Message):
         await interaction.response.defer(ephemeral=True, thinking=True)
+        # TODO: validate whether message is event here
+        event = await interaction.client.get_event(message.id)
+        if not type(event) == dict:  # idfk what redispy returns on fail
+            await interaction.followup.send(f'This is an invalid event (i.e. expired).')
+            return
+        
+        await interaction.client.clear_event(event['id'])
+        await message.delete()
+        await interaction.followup.send('Cleared!') # TODO: log in channel
 
     @app_commands.guild_only()
     @app_commands.checks.has_permissions(manage_events=True)
@@ -255,16 +277,13 @@ class event_cog(discord.ext.commands.Cog):
     @app_commands.checks.has_permissions(manage_events=True)
     async def start_event_ctx(self, interaction: discord.Interaction, message: discord.Message):
         await interaction.response.defer(ephemeral=True, thinking=True)
-        #if (not message.author == self.bot.user.id) or (not message.embeds):
-        #    await interaction.followup.send(f'This is not a {self.bot.user.mention} event.')
-        #    return
-        
+        # TODO: validate whether message is event here
         event = await interaction.client.get_event(message.id)
         if not type(event) == dict: # idfk what redispy returns on fail
             await interaction.followup.send(f'This is an invalid event (i.e. expired).')
             return
         
-        view = self._event_announcement_view(event_id=event['id'], information_label=event['FAQ']['label'])
+        view = self._event_announcement_view(client=self.bot, event_id=event['id'], information_label=event['FAQ']['label'])
         action_button: discord.ui.Button = [button for button in view.children if button.custom_id == f'action_{event['id']}'][0]
         action_button.label = 'Join Event'
         action_button.style = discord.ButtonStyle.url
@@ -273,6 +292,14 @@ class event_cog(discord.ext.commands.Cog):
         webhook = await self.bot.grab_webhook(message.channel)
         await webhook.edit_message(message_id=message.id, view=view)
         await interaction.followup.send(f'Started')
+        # TODO: register as started in redis cache too
+
+        for user_id, user_data in (await self.bot.get_interested(event_id=event['id'])).items():
+            member = message.guild.get_member(user_id) or await message.guild.fetch_member(user_id)
+            try:
+                await member.send(content=f'An event that you showed interest for has started. {message.jump_url}')
+            except:
+                pass
 
 
     @app_commands.guild_only()
