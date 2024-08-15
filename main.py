@@ -88,17 +88,13 @@ class Donut(discord.ext.commands.Bot):
         return event
 
     async def clear_event(self, event_id: int) -> None:
-        event = self.get_event(event_id)
+        event = await self.get_event(event_id)
         self.redis.hdel('events', event_id)
         self.redis.delete(f'interested_{event_id}')
         self.redis.delete(f'attendees_{event_id}')
 
-        webhook: discord.Webhook = await self.bot.grab_webhook(event['Webhook']['event_channel_id '])
-        message = await webhook.fetch_message(event['announcement'])
-        await message.delete()
-
     async def add_interested(self, event_id: int, user_id: int, user_data: dict) -> None:
-        self.redis.hset(f'interested_{event_id}', user_id, json.loads(user_data))
+        self.redis.hset(f'interested_{event_id}', user_id, json.dumps(user_data))
 
     async def get_interested(self, event_id: id) -> dict | None:
         resp = self.redis.hgetall(f'interested_{event_id}')
@@ -108,7 +104,7 @@ class Donut(discord.ext.commands.Bot):
         return interested
     
     async def add_attendee(self, event_id: int, user_id: int, user_data: dict) -> None:
-        self.redis.hset(f'attendees_{event_id}', user_id, user_data)
+        self.redis.hset(f'attendees_{event_id}', user_id, json.dumps(user_data))
 
     async def get_attendees(self, event_id: id) -> dict | None:
         resp = self.redis.hgetall(f'attendees_{event_id}')
