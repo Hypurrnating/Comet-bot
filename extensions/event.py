@@ -39,7 +39,7 @@ class event_cog(discord.ext.commands.Cog):
         
         for event in bot.redis.hgetall('events').values():
             event = json.loads(event)
-            view = self._event_announcement_view(event_id=event['id'])
+            view = self._event_announcement_view(event_id=event['id']) # Information label is not needed here because this is just for persistance and adding callback.
             bot.add_view(view)
 
     event_group = discord.app_commands.Group(name='event', description='Commands that help you manage sessions')
