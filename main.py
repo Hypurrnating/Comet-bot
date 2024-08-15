@@ -27,10 +27,8 @@ class Donut(discord.ext.commands.Bot):
         super().__init__(description='Donut :3',
                          command_prefix=discord.ext.commands.when_mentioned,
                          intents=intents, **options)
-
         self.bot = self
         self.quart = self.QuartWeb(self)
-        self.webhooks = dict()
         self.tree.on_error = self._on_tree_error
         self.errors = self.errors()
         self.redis: redis.client.Redis = None
@@ -38,11 +36,14 @@ class Donut(discord.ext.commands.Bot):
         discord.utils.setup_logging(level=logging.INFO)
         logging.getLogger('discord.gateway').setLevel(30)   # Stops a flood of "gate RESUMED" messages      
 
+
+    async def load_extensions(self):
         for x in pathlib.Path(f'./extensions').iterdir():
             if x.is_file():
                 if not x.name in ['starboard.py']:
-                    asyncio.create_task(self.load_extension(f'extensions.{x.name.split(".")[0]}'))
-        asyncio.create_task(self.load_extension('jishaku'))
+                    await self.load_extension(f'extensions.{x.name.split(".")[0]}')
+        if platform.system == 'Windows':    # Host is usually Linux, so this would mean its being run on my local machine
+            await self.load_extension('jishaku')
 
 
     async def create_tables(self):
@@ -76,10 +77,10 @@ class Donut(discord.ext.commands.Bot):
 
     async def set_event(self, event: dict):
         events = json.dumps(event)
-        self.redis.set(f'event_{event['id']}', events)
+        self.redis.hset(name='events', key=f'event_{event['id']}', value=events)
 
     async def get_event(self, event_id: int):
-        resp = self.redis.get(f'event_{event_id}')
+        resp = self.redis.hget(name='events', key=f'event_{event_id}')
         try:
             event = json.loads(resp)
         except:
@@ -87,7 +88,8 @@ class Donut(discord.ext.commands.Bot):
         return event
 
     async def del_event(self, event_id: int):
-        self.redis.delete(event_id)
+        self.redis.hdel('events', event_id)
+
 
     async def is_bot_webhook(self, webhook: discord.Webhook) -> bool:
         """Check if the webhook is created by THIS bot
@@ -195,6 +197,7 @@ async def main():
                                    port=os.environ.get('PGPORT')) as psql:
         bot.psql = psql
         bot.redis = _redis
+        await bot.load_extensions() # I load extensions after connecting to dbs cause some functions depend on that
         tasks = [bot.quart.run(), bot.start(os.environ.get('TOKEN'))]
         await asyncio.gather(*tasks)
 if __name__ == '__main__':
