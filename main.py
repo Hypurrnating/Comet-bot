@@ -88,8 +88,7 @@ class Donut(discord.ext.commands.Bot):
         return event
 
     async def clear_event(self, event_id: int) -> None:
-        event = await self.get_event(event_id)
-        self.redis.hdel('events', event_id)
+        self.redis.hdel('events', f'event_{event_id}')
         self.redis.delete(f'interested_{event_id}')
         self.redis.delete(f'attendees_{event_id}')
 
