@@ -51,6 +51,7 @@ class event_cog(discord.ext.commands.Cog):
             super().__init__(timeout=timeout)
             self.information.label = information_label
             self.information.custom_id = self.information.custom_id + f'_{event_id}'
+            self.action.custom_id = self.action.custom_id + f'_{event_id}'
         
         @discord.ui.button(label='I\'m interested', style=discord.ButtonStyle.green, custom_id='action')
         async def action(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -60,8 +61,8 @@ class event_cog(discord.ext.commands.Cog):
                                                             username = interaction.user.global_name,
                                                             avatar_url = interaction.user.display_avatar.url)
         
-        @discord.ui.button(style=discord.ButtonStyle.gray)  # Label is handled by init
-        async def information(self, interaction: discord.Interaction, button: discord.ui.Button, custom_id = 'information'):
+        @discord.ui.button(style=discord.ButtonStyle.gray, custom_id = 'information')  # Label is handled by init
+        async def information(self, interaction: discord.Interaction, button: discord.ui.Button):
             await interaction.response.defer(ephemeral=True, thinking=True)
             event = await interaction.client.get_event(self.event_id)
             msg = f"This is an event hosted by the server (using {interaction.client.user.mention}). "\
@@ -261,8 +262,8 @@ class event_cog(discord.ext.commands.Cog):
             await interaction.followup.send(f'This is an invalid event (i.e. expired).')
             return
         
-        view = discord.ui.View.from_message(message)
-        action_button: discord.ui.Button = [button for button in view.children if button.custom_id == 'action'][0]
+        view = self._event_announcement_view(event_id=event['id'])
+        action_button: discord.ui.Button = [button for button in view.children if button.custom_id == f'action_{event['id']}'][0]
         action_button.label = 'Join Event'
         action_button.style = discord.ButtonStyle.url
         action_button.custom_id = None
