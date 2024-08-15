@@ -147,7 +147,6 @@ class event_cog(discord.ext.commands.Cog):
     async def _create_event(self, interaction: discord.Interaction, config: dict):
         channel = interaction.guild.get_channel(config['Webhook']['event_channel_id']) or await interaction.guild.fetch_channel(config['Webhook']['event_channel_id'])
         webhook = await self.bot.grab_webhook(channel)
-        config['id'] = interaction.id
         config['interested'] = dict()
 
         view = self._create_event_param_view(config=config)
@@ -163,7 +162,6 @@ class event_cog(discord.ext.commands.Cog):
         if config.get('Parameters'):
             for param in config['params'].keys():
                 embed.add_field(name=param, value=config['params'][param])
-        embed.set_footer(text=config['id'])
 
         view = self._event_announcement_view(event_id=config['id'], information_label=config['FAQ']['label'])
 
@@ -174,6 +172,7 @@ class event_cog(discord.ext.commands.Cog):
                                           username=config['Webhook']['webhook_name'] or interaction.guild.name,
                                           avatar_url=config['Webhook']['webhook_avatar_url'] or interaction.guild.icon.url)
         config['announcement'] = announcement.id
+        config['id'] = announcement.id
         try:
             await self.bot.set_event(config)
         except Exception as exception:
@@ -257,7 +256,7 @@ class event_cog(discord.ext.commands.Cog):
         #    await interaction.followup.send(f'This is not a {self.bot.user.mention} event.')
         #    return
         
-        event = await interaction.client.get_event(message.embeds[0].footer.text)
+        event = await interaction.client.get_event(message.id)
         if not type(event) == dict: # idfk what redispy returns on fail
             await interaction.followup.send(f'This is an invalid event (i.e. expired).')
             return
