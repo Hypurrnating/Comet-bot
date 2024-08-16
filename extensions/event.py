@@ -73,12 +73,12 @@ class event_cog(discord.ext.commands.Cog):
     # This is a listener which will listen for *all* message deletes and check whether they had something to do with an event
     @discord.ext.commands.Cog.listener(name='on_raw_message_delete')
     async def event_garbcol_message_delete(self, payload: discord.RawMessageDeleteEvent):
-        event = await self.bot.get_event(payload.message_id)
         # Not a lot of easy sanity checks are possible, so we will just try to make do
         if payload.cached_message:
             if not payload.cached_message.author.bot: 
                 return
         # Finally call redis and make absolutely sure that this was an ongoing event, then garbage it.
+        event = await self.bot.get_event(payload.message_id)
         if not event:
             return
         await self.garabage_event(payload.message_id, event)
