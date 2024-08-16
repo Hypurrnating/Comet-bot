@@ -39,7 +39,6 @@ class event_cog(discord.ext.commands.Cog):
             name='Add as co-host to event', callback=self.add_cohost_event_ctx))
         
         for event_id, event in (bot._get_all_events()).items():
-            event = json.loads(event)
             view = self._event_announcement_view(client=self.bot, event_id=event_id) # Information label is not needed here because this is just for persistance and adding callback.
             bot.add_view(view)
         
