@@ -224,19 +224,23 @@ class Donut(discord.ext.commands.Bot):
 
 async def main():
     bot = Donut()
+    logging.info('Initialized bot')
     _redis = redis.Redis(host=os.environ.get('REDISHOST'),
                          port=os.environ.get('REDISPORT'),
                          password=os.environ.get('REDISPASSWORD'),
                          username=os.environ.get('REDISUSER'),
                          decode_responses=True)
+    logging.info('Create redis')
     async with asyncpg.create_pool(database=os.environ.get('PGDATABASE'),
                                    host=os.environ.get('PGHOST'),
                                    user=os.environ.get('PGUSER'),
                                    password=os.environ.get('PGPASSWORD'),
                                    port=os.environ.get('PGPORT')) as psql:
+        logging.info('Create psql')
         bot.psql = psql
         bot.redis = _redis
         await bot.load_extensions() # I load extensions after connecting to dbs cause some functions depend on that
+        logging.info('Loaded extensions')
         tasks = [bot.quart.run(), bot.start(os.environ.get('TOKEN'))]
         await asyncio.gather(*tasks)
 if __name__ == '__main__':
