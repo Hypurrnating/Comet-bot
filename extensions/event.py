@@ -15,7 +15,9 @@ import os
 import datetime
 import json
 import sorcery
+import logging
 from sorcery import dict_of
+from datetime import datetime, timedelta, timezone
 
 sys.path.insert(0, '..')
 import main as donut
@@ -56,12 +58,14 @@ class event_cog(discord.ext.commands.Cog):
     " Event Garbage Collection "
 
     # This is the main function which garbages events
-    async def garabage_event(self, event_id: int, event: dict, message: discord.Message = None):
+    async def garabage_event(self, event_id: int, event: dict, message: discord.Message | bool = None):
         await self.bot.clear_event(event_id)
         if message:
+            if isinstance(message, bool):
+                message = discord.PartialMessage(channel=event('channel_id'), id=event['announcement_id'], guild=event['guild_id'])
             try:
                 await message.delete()
-            except: # Maybe I  should catch *some* exceptions and not just completely IGNORE what it raised
+            except:  # Maybe I  should catch *some* exceptions and not just completely IGNORE what it raised
                 pass
         # TODO: Log event
 
@@ -82,13 +86,20 @@ class event_cog(discord.ext.commands.Cog):
     @discord.ext.tasks.loop(seconds=30.0)
     async def event_garbcol_loop(self):
         print('Ding ding! Garbage collection.')
+        garbaged = list() # just a list i use to count how many were garbaged
         for event_id, event in (self.bot._get_all_events()).items():
             interested = await self.bot.get_interested(event_id)
             attendees = await self.bot.get_attendees(event_id)
-            last_interested = max([interest['utc'] for interest in interested.values()])
-            last_attendee = max([attend['utc'] for attend in attendees.values()])
-            print(last_interested)
-            print(last_attendee)
+            interests = [interest['utc'] for interest in interested.values()]
+            attends = [attend['utc'] for attend in attendees.values()]
+            last_interested = max(interests) if interests else None
+            last_attendee = max(attends) if attends else None
+            last_activity = max(list(last_interested, last_attendee))
+            if (self.bot.now_utc_timestamp - last_activity) > timedelta(seconds=30).seconds:
+                self.garabage_event(event_id, event, message=True)
+                garbaged.append(event_id)
+
+        logging.info(f'Garbaged {len(garbaged)} events.\n{garbaged}')
 
 
     class _event_announcement_view(discord.ui.View):
@@ -129,11 +140,10 @@ class event_cog(discord.ext.commands.Cog):
                                             username=event['Webhook']['webhook_name'] or interaction.guild.name,
                                             avatar_url=event['Webhook']['webhook_avatar_url'] or interaction.guild.icon.url)
         
-        async def on_timeout(self) -> None:
+        async def on_timeout(self) -> None:     # TODO: see if this is useless or not
             event = await self.bot.get_event(self.event_id)
             await self.bot.clear_event(self.event_id)
-            channel = self.bot.get_channel(event['channel_id']) or await self.bot.fetch_channel(event['channel_id'])
-            message = channel.get_partial_message(event['announcement_id']) or await channel.fetch_message(event['announcement_id'])
+            message = discord.PartialMessage(channel=event('channel_id'), id=event['announcement_id'], guild=event['guild_id'])
             await message.delete()
             # TODO: Log event on timeout
 
