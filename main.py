@@ -11,7 +11,7 @@ import typing
 import traceback
 import json
 from multiprocessing.connection import Listener
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 from dotenv import load_dotenv
 import quart
 from quart import Quart, Response, jsonify, request, session, redirect, url_for, render_template, render_template_string, Markup, websocket
@@ -42,7 +42,8 @@ class Donut(discord.ext.commands.Bot):
             if x.is_file():
                 if not x.name in ['starboard.py']:
                     await self.load_extension(f'extensions.{x.name.split(".")[0]}')
-        if platform.system == 'Windows':    # Host is usually Linux, so this would mean its being run on my local machine
+        if platform.system() == 'Windows':    # Host is usually Linux, so this would mean its being run on my local machine
+            print('Loading Jishaku')
             await self.load_extension('jishaku')
 
 
@@ -74,6 +75,9 @@ class Donut(discord.ext.commands.Bot):
             """ """
             pass
               
+    @property
+    def now_utc_timestamp(self) -> int:
+        return int(datetime.now(timezone.utc).timestamp())
 
     async def set_event(self, event: dict) -> None:
         events = json.dumps(event)
@@ -86,6 +90,18 @@ class Donut(discord.ext.commands.Bot):
         except:
             return None
         return event
+    
+    # I did this because the cog needs non-awaitable func
+    def _get_all_events(self) -> dict:
+        resp = self.redis.hgetall(name='events')
+        events = dict()
+        for event in resp.values():
+            event = json.loads(event)
+            events[event['id']] = event
+        return events
+    
+    async def get_all_events(self) -> dict:
+        return self.get_all_events()
 
     async def clear_event(self, event_id: int) -> None:
         self.redis.hdel('events', f'event_{event_id}')
@@ -93,6 +109,7 @@ class Donut(discord.ext.commands.Bot):
         self.redis.delete(f'attendees_{event_id}')
 
     async def add_interested(self, event_id: int, user_id: int, user_data: dict) -> None:
+        user_data['utc'] = self.now_utc_timestamp
         self.redis.hset(f'interested_{event_id}', user_id, json.dumps(user_data))
 
     async def get_interested(self, event_id: id) -> dict | None:
