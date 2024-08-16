@@ -55,7 +55,7 @@ class event_cog(discord.ext.commands.Cog):
     # Maybe I can just listen to on_message_delete
     # TODO: Garbage collection should also include VIEWS
 
-    " Event Garbage Collection "
+    """ Event Garbage Collection """
 
     # This is the main function which garbages events
     async def garbage_event(self, event_id: int, event: dict, message: discord.Message | bool = None):
@@ -102,7 +102,8 @@ class event_cog(discord.ext.commands.Cog):
 
         logging.info(f'Garbaged {len(garbaged)} events.\n{garbaged}')
 
-
+    """ Views """
+    
     class _event_announcement_view(discord.ui.View):
         def __init__(self, *, client: donut.Donut, event_id: int, information_label: str = 'Information', timeout=None):
             self.event_id = event_id
@@ -211,6 +212,8 @@ class event_cog(discord.ext.commands.Cog):
                 return
             await self.message.edit(view=self)
 
+
+    """ Interactions """
 
     async def _create_event(self, interaction: discord.Interaction, config: dict):
         channel = interaction.guild.get_channel(config['Webhook']['event_channel_id']) or await interaction.guild.fetch_channel(config['Webhook']['event_channel_id'])
