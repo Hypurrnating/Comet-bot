@@ -4,6 +4,7 @@ import discord.ext.commands
 from discord import Interaction, app_commands
 import asyncio
 import typing
+import discord.ext.tasks
 import validators
 import urllib
 import urllib.parse
@@ -37,14 +38,59 @@ class event_cog(discord.ext.commands.Cog):
         self.bot.tree.add_command(app_commands.ContextMenu(
             name='Add as co-host to event', callback=self.add_cohost_event_ctx))
         
-        for event in bot.redis.hgetall('events').values():
+        for event_id, event in (bot._get_all_events()).items():
             event = json.loads(event)
-            view = self._event_announcement_view(client=self.bot, event_id=event['id']) # Information label is not needed here because this is just for persistance and adding callback.
+            view = self._event_announcement_view(client=self.bot, event_id=event_id) # Information label is not needed here because this is just for persistance and adding callback.
             bot.add_view(view)
+        
+        self.event_garbcol_loop.start()
 
     event_group = discord.app_commands.Group(name='event', description='Commands that help you manage sessions')
 
     # TODO: Garbage collector for events that timeouts views/expires events if inactive and also if announcement message was deleted
+    # One possibility for the garbage collector to detect "dead" events is checking the latest join. If nobody new has joined the 
+    # event in, say, 6 hours. Then the event has died. Missing announcement messages mean immediate garbage. Although fetching messages
+    # every 30 minutes or so can quickly spiral out of control because thats a lot of api calls. Redis calls are internal anyways.
+    # Maybe I can just listen to on_message_delete
+    # TODO: Garbage collection should also include VIEWS
+
+    " Event Garbage Collection "
+
+    # This is the main function which garbages events
+    async def garabage_event(self, event_id: int, event: dict, message: discord.Message = None):
+        await self.bot.clear_event(event_id)
+        if message:
+            try:
+                await message.delete()
+            except: # Maybe I  should catch *some* exceptions and not just completely IGNORE what it raised
+                pass
+        # TODO: Log event
+
+    # This is a listener which will listen for *all* message deletes and check whether they had something to do with an event
+    @discord.ext.commands.Cog.listener(name='on_raw_message_delete')
+    async def event_garbcol_message_delete(self, payload: discord.RawMessageDeleteEvent):
+        event = await self.bot.get_event(payload.message_id)
+        # Not a lot of easy sanity checks are possible, so we will just try to make do
+        if payload.cached_message:
+            if not payload.cached_message.author.bot: 
+                return
+        # Finally call redis and make absolutely sure that this was an ongoing event, then garbage it.
+        if not event:
+            return
+        await self.garabage_event(payload.message_id, event)
+    
+    # This is a task which will call all ongoing events and decide if they have died or not, then decide whether to garbage them
+    @discord.ext.tasks.loop(seconds=30.0)
+    async def event_garbcol_loop(self):
+        print('Ding ding! Garbage collection.')
+        for event_id, event in (self.bot._get_all_events()).items():
+            interested = await self.bot.get_interested(event_id)
+            attendees = await self.bot.get_attendees(event_id)
+            last_interested = max([interest['utc'] for interest in interested.values()])
+            last_attendee = max([attend['utc'] for attend in attendees.values()])
+            print(last_interested)
+            print(last_attendee)
+
 
     class _event_announcement_view(discord.ui.View):
         def __init__(self, *, client: donut.Donut, event_id: int, information_label: str = 'Information', timeout=None):
