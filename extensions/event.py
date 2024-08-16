@@ -81,7 +81,7 @@ class event_cog(discord.ext.commands.Cog):
         event = await self.bot.get_event(payload.message_id)
         if not event:
             return
-        await self.garabage_event(payload.message_id, event)
+        await self.garbage_event(payload.message_id, event)
     
     # This is a task which will call all ongoing events and decide if they have died or not, then decide whether to garbage them
     @discord.ext.tasks.loop(minutes=30)
