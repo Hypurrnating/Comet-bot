@@ -56,7 +56,8 @@ class Donut(discord.ext.commands.Bot):
 
 
     async def on_ready(self):
-        await self.tree.sync()
+        #await self.tree.sync()
+        pass
 
     async def _on_tree_error(self, interaction: discord.Interaction, error: discord.app_commands.AppCommandError):
         await interaction.followup.send(f'Ran into an error :/\n```{error}```', ephemeral=True)
@@ -101,7 +102,7 @@ class Donut(discord.ext.commands.Bot):
         return events
     
     async def get_all_events(self) -> dict:
-        return self.get_all_events()
+        return (self._get_all_events())
 
     async def clear_event(self, event_id: int) -> None:
         self.redis.hdel('events', f'event_{event_id}')
