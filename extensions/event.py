@@ -241,8 +241,15 @@ class event_cog(discord.ext.commands.Cog):
                                           avatar_url=config['Webhook']['webhook_avatar_url'] or interaction.guild.icon.url)
         config['guild_id'] = interaction.guild_id
         config['channel_id'] = interaction.channel_id
+        # announcement and message are interchangeable
         config['announcement_id'] = announcement.id
+        config['message_id'] = announcement.id
         config['id'] = announcement.id
+        config['host'] = interaction.user.id
+        config['utc'] = self.bot.now_utc_timestamp
+        config['locked'] = False
+        config['started'] = False
+        config['co_hosts'] = list()
 
         view = self._event_announcement_view(client=self.bot, event_id=config['id'], information_label=config['FAQ']['label'])
 
