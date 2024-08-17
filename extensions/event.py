@@ -372,7 +372,22 @@ class event_cog(discord.ext.commands.Cog):
     @app_commands.guild_only()
     @app_commands.checks.has_permissions(manage_events=True)
     async def add_cohost_event_ctx(self, interaction: discord.Interaction, member: discord.Member):
+        """ Co hosts are a log thing only. They do not get special privileges. """
         await interaction.response.defer(ephemeral=True, thinking=True)
+
+        event = None
+        for _event in (await self.bot.get_all_events()).values():
+            if (_event['host'] == interaction.user.id) and (_event['guild_id'] == interaction.guild.id):
+                event = _event
+                break
+        if not event:
+            await interaction.followup.send('You dont have any active meets in this guild')
+            return
+        event['co_hosts'].append(member.id)
+        await self.bot.set_event(event)
+        await interaction.followup.send(f'Added {member.mention} to the co hosts!\n'
+                                        '-# Keep in mind that co hosts are purely for organization and logging, '
+                                        'and the member has not been granted any special permissions.')
 
 
     @event_group.command(name='new',
