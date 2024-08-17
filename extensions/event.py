@@ -216,6 +216,12 @@ class event_cog(discord.ext.commands.Cog):
     """ Interactions """
 
     async def _create_event(self, interaction: discord.Interaction, config: dict):
+        for event in (await self.bot.get_all_events()).values():
+            if (event['host'] == interaction.user.id) and (event['guild_id'] == interaction.guild.id):
+                await interaction.followup.send(f'You have already started an event in this guild.\n Please end it, or wait for at least 6 hours.', ephemeral=True)
+                # TODO: Give a button for the user to end their on going meet
+                return
+
         channel = interaction.guild.get_channel(config['Webhook']['event_channel_id']) or await interaction.guild.fetch_channel(config['Webhook']['event_channel_id'])
         webhook = await self.bot.grab_webhook(channel)
         config['interested'] = dict()
