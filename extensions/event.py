@@ -93,8 +93,8 @@ class event_cog(discord.ext.commands.Cog):
             attendees = await self.bot.get_attendees(event_id)
             interests = [interest['utc'] for interest in interested.values()]
             attends = [attend['utc'] for attend in attendees.values()]
-            last_interested = max(interests) if interests else 0
-            last_attendee = max(attends) if attends else 0
+            last_interested = max(interests) if interests else event['utc']
+            last_attendee = max(attends) if attends else event['utc']
             last_activity = max([last_interested, last_attendee])
             if (self.bot.now_utc_timestamp - last_activity) > timedelta(hours=6).seconds:
                 await self.garbage_event(event_id, event, message=True)
