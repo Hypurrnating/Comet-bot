@@ -26,8 +26,11 @@ class Donut(discord.ext.commands.Bot):
         intents.message_content = True
         super().__init__(description='Donut :3',
                          command_prefix=discord.ext.commands.when_mentioned,
-                         intents=intents, **options)
+                         intents=intents,
+                         owner_id=1226476776683868241
+                         , **options)
         self.bot = self
+        self.setup_ctx_commands()
         self.quart = self.QuartWeb(self)
         self.tree.on_error = self._on_tree_error
         self.errors = self.errors()
@@ -43,8 +46,8 @@ class Donut(discord.ext.commands.Bot):
                 if not x.name in ['starboard.py']:
                     await self.load_extension(f'extensions.{x.name.split(".")[0]}')
         if platform.system() == 'Windows':    # Host is usually Linux, so this would mean its being run on my local machine
-            print('Loading Jishaku')
             await self.load_extension('jishaku')
+            logging.info('Loaded jishaku')
 
 
     async def create_tables(self):
@@ -55,8 +58,26 @@ class Donut(discord.ext.commands.Bot):
         #await (await self.sqlite.cursor()).execute('CREATE TABLE IF NOT EXISTS events(id INTEGER PRIMARY KEY AUTOINCREMENT, )')
 
 
+    def setup_ctx_commands(self):
+        @self.command(name='sync')
+        async def sync_command(ctx: discord.ext.commands.Context):
+            if not ctx.author.id == self.bot.owner_id:
+                return
+            logging.info(f'Syncing tree on command')
+            await self.tree.sync()
+            await ctx.send('Synced ✨')
+        
+        @self.command(name='shutdown')
+        async def shutdown_command(ctx: discord.ext.commands.Context):
+            if not ctx.author.id == self.bot.owner_id:
+                return
+            logging.critical(f'Shutting down on command')
+            await ctx.send(f'Bye bye 😵')
+            await self.close()
+            exit()
+
+
     async def on_ready(self):
-        #await self.tree.sync()
         pass
 
     async def _on_tree_error(self, interaction: discord.Interaction, error: discord.app_commands.AppCommandError):
