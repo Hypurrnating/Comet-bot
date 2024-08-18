@@ -354,7 +354,8 @@ class event_cog(discord.ext.commands.Cog):
         action_button.label = 'Join Event'
         action_button.style = discord.ButtonStyle.url
         action_button.custom_id = None
-        action_button.url = event['join_url']
+        url = f'https://donut.imady.pro/event/{urllib.parse.quote((event['Configuration']['title']).replace(' ', '-'))}/{event['id']}'
+        action_button.url = url
         webhook = await self.bot.grab_webhook(message.channel)
         await webhook.edit_message(message_id=message.id, view=view)
         await interaction.followup.send(f'Started')
