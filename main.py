@@ -84,10 +84,10 @@ class Donut(discord.ext.commands.Bot):
 
     async def set_event(self, event: dict) -> None:
         events = json.dumps(event)
-        self.redis.hset(name='events', key=f'event_{event['id']}', value=events)
+        self.redis.hset(name='events', key=f'{event['id']}', value=events)
 
     async def get_event(self, event_id: int) -> dict | None:
-        resp = self.redis.hget(name='events', key=f'event_{event_id}')
+        resp = self.redis.hget(name='events', key=f'{event_id}')
         try:
             event = json.loads(resp)
         except:
