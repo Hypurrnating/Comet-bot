@@ -28,17 +28,15 @@ class event_cog(discord.ext.commands.Cog):
         self.bot = bot
         super().__init__()
         self.bot.tree.add_command(app_commands.ContextMenu(
-            name='Create from message', callback=self.create_event_ctx))
+            name='Create from message', callback=self.create_event_ctx, allowed_contexts=app_commands.AppCommandContext.GUILD))
         self.bot.tree.add_command(app_commands.ContextMenu(
-            name='End this event', callback=self.end_event_ctx))
+            name='End this event', callback=self.end_event_ctx, allowed_contexts=app_commands.AppCommandContext.GUILD))
         self.bot.tree.add_command(app_commands.ContextMenu(
-            name='Edit this event', callback=self.edit_event_ctx))
+            name='Edit this event', callback=self.edit_event_ctx, allowed_contexts=app_commands.AppCommandContext.GUILD))
         self.bot.tree.add_command(app_commands.ContextMenu(
-            name='Lock this event', callback=self.lock_event_ctx))
+            name='Start this event', callback=self.start_event_ctx, allowed_contexts=app_commands.AppCommandContext.GUILD))
         self.bot.tree.add_command(app_commands.ContextMenu(
-            name='Start this event', callback=self.start_event_ctx))
-        self.bot.tree.add_command(app_commands.ContextMenu(
-            name='Add as co-host to event', callback=self.add_cohost_event_ctx))
+            name='Add as co-host to event', callback=self.add_cohost_event_ctx, allowed_contexts=app_commands.AppCommandContext.GUILD))
         
         for event_id, event in (bot._get_all_events()).items():
             view = self._event_announcement_view(client=self.bot, event_id=event_id) # Information label is not needed here because this is just for persistance and adding callback.
@@ -339,11 +337,6 @@ class event_cog(discord.ext.commands.Cog):
     @app_commands.guild_only()
     @app_commands.checks.has_permissions(manage_events=True)
     async def edit_event_ctx(self, interaction: discord.Interaction, message: discord.Message):
-        await interaction.response.defer(ephemeral=True, thinking=True)
-
-    @app_commands.guild_only()
-    @app_commands.checks.has_permissions(manage_events=True)
-    async def lock_event_ctx(self, interaction: discord.Interaction, message: discord.Message):
         await interaction.response.defer(ephemeral=True, thinking=True)
 
     @app_commands.guild_only()
