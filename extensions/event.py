@@ -348,6 +348,9 @@ class event_cog(discord.ext.commands.Cog):
         if not type(event) == dict: # idfk what redispy returns on fail
             await interaction.followup.send(f'This is an invalid event (i.e. expired).')
             return
+        if event['started']:
+            await interaction.followup.send(f'This event already started.')
+            return
         
         event['started'] = True
         await self.bot.set_event(event)
