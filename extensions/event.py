@@ -84,7 +84,7 @@ class event_cog(discord.ext.commands.Cog):
     # This is a task which will call all ongoing events and decide if they have died or not, then decide whether to garbage them
     @discord.ext.tasks.loop(minutes=30)
     async def event_garbcol_loop(self):
-        print('Ding ding! Garbage collection.')
+        logging.info('Ding ding! Garbage collection.')
         garbaged = list() # just a list i use to count how many were garbaged
         for event_id, event in (self.bot._get_all_events()).items():
             interested = await self.bot.get_interested(event_id)
