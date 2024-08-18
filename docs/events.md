@@ -1,4 +1,8 @@
-# Events
+---
+layout: default
+title: Event
+description: This contains everything to do with the events group
+---
 
 (I will write an introduction to this later)
 
