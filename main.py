@@ -79,6 +79,8 @@ class Donut(discord.ext.commands.Bot):
     @property
     def now_utc_timestamp(self) -> int:
         return int(datetime.now(timezone.utc).timestamp())
+    
+    # TODO: add expiry to all keys
 
     async def set_event(self, event: dict) -> None:
         events = json.dumps(event)
