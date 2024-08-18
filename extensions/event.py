@@ -349,6 +349,9 @@ class event_cog(discord.ext.commands.Cog):
             await interaction.followup.send(f'This is an invalid event (i.e. expired).')
             return
         
+        event['started'] = True
+        await self.bot.set_event(event)
+        
         view = self._event_announcement_view(client=self.bot, event_id=event['id'], information_label=event['FAQ']['label'])
         action_button: discord.ui.Button = [button for button in view.children if button.custom_id == f'action_{event['id']}'][0]
         action_button.label = 'Join Event'
