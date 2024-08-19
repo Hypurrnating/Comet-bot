@@ -9,3 +9,4 @@ Donut is more of a multipurpose Discord bot; at the moment the key feature is th
 - Verifying the Discord users with their Roblox accounts as they join.
 - Collecting anonymous location and device data from users that join. 
 - Posting detailed logs (also helps with staff management)
+
