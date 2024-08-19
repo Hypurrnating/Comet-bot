@@ -1,0 +1,6 @@
+[book]
+authors = ["Hypurrnating"]
+language = "en"
+multilingual = false
+src = "src"
+title = "Donut Docs"
