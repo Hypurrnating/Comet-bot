@@ -8,4 +8,3 @@
 [![LICENSE](https://img.shields.io/github/license/Hypurrnating/Donut.svg?style=for-the-badge&color=black)](LICENSE)\
 [![Contributors](https://img.shields.io/github/contributors/Hypurrnating/Donut?style=for-the-badge&color=black)]()\
 [![Contributors](https://img.shields.io/github/last-commit/Hypurrnating/Donut/railway?style=for-the-badge&label=Bot%20updated&color=black)]()
-
