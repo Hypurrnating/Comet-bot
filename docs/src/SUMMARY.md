@@ -4,5 +4,5 @@
 
 # Bot Features
 - [Events](./events/main.md)
-    - [How to setup](./events/setup.md)
-    - [How to start and manage events](./events/start.md)
+    - [Setup](./events/setup.md)
+    - [Start and manage events](./events/start.md)
