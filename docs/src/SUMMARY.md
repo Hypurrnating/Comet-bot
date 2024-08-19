@@ -1,4 +1,7 @@
 # Summary
 
 - [Home](./home.md)
-- [Events](./events.md)
+
+# Bot features
+- [Events](./events/main.md)
+    - [How to use](./events/usage.md)

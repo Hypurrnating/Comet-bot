@@ -5,4 +5,7 @@ multilingual = false
 src = "src"
 title = "Donut Docs"
 
+git-repository-url = "https://github.com/Hypurrnating/Donut"
+git-repository-icon = "fa-github"
+
 [preprocessor.alerts]
