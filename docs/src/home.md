@@ -1,6 +1,6 @@
 Welcome to the Donut wiki!
 
-This will also serve as a guide for those who want to learn more about the bot and how to use it.
+This includes most of the information you need about the bot, including how to use it.
 Issues with the bot belong in [the issues tab](https://github.com/Hypurrnating/Donut/issues), and other general discussion goes [in the discussions tab](https://github.com/Hypurrnating/Donut/discussions).
 
 Donut is more of a multipurpose Discord bot; at the moment the key feature is the `events` group. These commands are centered around Roblox Discord servers that host frequent sessions and helps them streamline the process by making it quick to set up events and recording key information about the event itself to provide useful statistics. The bot makes things easier by:

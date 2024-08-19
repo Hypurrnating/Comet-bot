@@ -2,6 +2,7 @@
 
 - [Home](./home.md)
 
-# Bot features
+# Bot Features
 - [Events](./events/main.md)
-    - [How to use](./events/usage.md)
+    - [How to setup](./events/setup.md)
+    - [How to start and manage events](./events/start.md)

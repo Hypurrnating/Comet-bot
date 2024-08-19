@@ -1,4 +1,3 @@
-
 # [Read more about Donut in the docs](https://docs-donut.imady.pro/home.html)
 
 [![Website Status](https://img.shields.io/website?url=https%3A%2F%2Fdonut.imady.pro%2F&label=Website%20status&style=for-the-badge)](https://donut.imady.pro)
