@@ -28,7 +28,7 @@ class event_cog(discord.ext.commands.Cog):
         self.bot = bot
         super().__init__()
         self.bot.tree.add_command(app_commands.ContextMenu(
-            name='Create from message', callback=self.create_event_ctx, allowed_contexts=app_commands.AppCommandContext.GUILD))
+            name='Create an event', callback=self.create_event_ctx, allowed_contexts=app_commands.AppCommandContext.GUILD))
         self.bot.tree.add_command(app_commands.ContextMenu(
             name='End this event', callback=self.end_event_ctx, allowed_contexts=app_commands.AppCommandContext.GUILD))
         self.bot.tree.add_command(app_commands.ContextMenu(
@@ -268,57 +268,13 @@ class event_cog(discord.ext.commands.Cog):
         await msg.edit(content=f'Announced! {announcement.jump_url}', view=None)
 
 
-    async def preprocess_toml(self, toml: str) -> str:
-        # Process titles
-        for line in toml.splitlines():
-            pattern = re.compile('^\\[.+\\]')
-            tables = re.findall(pattern, line)
-            if not tables:
-                continue 
-            for table in tables:
-                # Check if the title isn't already wrapped in quotes
-                pattern = re.compile('\\[".+"\\]')
-                check = re.search(pattern, table)
-                if check: 
-                    continue
-                # Wrap it in quotes
-                pattern = re.compile('[a-zA-Z0-9_\\s\\.-]+')
-                _title = re.search(pattern, table).group()
-                title_ = f'"{_title}"'
-                toml = toml.replace(_title, title_)
-
-        # Process bools
-        pattern = re.compile(r'.+\s*=\s*true|.+\s*=\s*false', re.IGNORECASE)
-        bools = re.findall(pattern, toml)
-        for bool in bools:
-            pattern = re.compile('true|false', re.IGNORECASE)
-            _bool = re.search(pattern, bool).group()
-            bool_ = pattern.sub(_bool.lower(), bool)
-            toml = toml.replace(bool, bool_)
-        return toml
-
     @app_commands.guild_only()
     @app_commands.checks.has_permissions(create_events = True, manage_events = True)
     async def create_event_ctx(self, interaction: discord.Interaction, message: discord.Message):
         await interaction.response.defer(ephemeral=True, thinking=True)
         
-        if not isinstance(message.author, discord.Member):
-            message.author = message.guild.get_member(message.author.id) if message.guild.get_member(message.author.id) else await message.guild.fetch_member(message.author.id)
-        if not message.author.guild_permissions.create_events:
-            await interaction.followup.send(content=f'The author of the template must have `create_events` permission.')
-            return
-        
-        pattern = re.compile(r'```toml.*```', re.DOTALL)
-        tomls = re.findall(pattern, message.content)
-        if not tomls or len(tomls) > 1:
-            await interaction.followup.send(content=f'Could not detect a template in this message.'); return
-        toml = await self.preprocess_toml(tomls[0].replace('```toml', '').replace('```', '').strip())
-        try:
-            config = tomllib.loads(toml)
-        except Exception as exception:
-            await interaction.followup.send(content=f'Ran into an error parsing the config:\n`{exception}`\n[Tools like this one can help fix that](https://www.toml-lint.com/)')
-            return
-        await self._create_event(interaction, config)
+        await interaction.followup.send(f'Click on the link below to create a template.'
+                                        f'\nhttps://donut.imady.pro/template/create/{interaction.guild.id}') # TODO: need a better way to get url scheme
 
     @app_commands.guild_only()
     @app_commands.checks.has_permissions(manage_events=True)
