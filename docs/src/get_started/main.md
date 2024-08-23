@@ -4,8 +4,8 @@ This section details the steps needed to start using Donut. \
 Go to the next page for the next step
 
 > [!NOTE]
-> While inviting the bot, it is recommended to keep all the permissions `enabled`. This is to ensure future compatibility.\
-> However, there are a few permissions which are essential to the bots operations, and reflect the bots true usage.
+> It is recommended to keep all the permissions enabled when inviting the bot. This is to ensure future compatibility.\
+> However, only a few permissions are essential to the bots operations, and reflect the bots true usage.
 > These are:
 > - `Manage Webhooks`
 > - `Manage Events`
