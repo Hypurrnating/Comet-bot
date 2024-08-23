@@ -26,6 +26,6 @@ This will send a link. Fill out the form on the link and once your template has 
 This table lists the questions that are in the template form, and what they mean.
 
 | Field | Required | What to input |
----
+| --- | --- | --- |
 | Title | Yes | The title of your event. |
 | Description | Yes | What your event is about. |
