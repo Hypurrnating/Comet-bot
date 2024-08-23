@@ -9,3 +9,6 @@ git-repository-url = "https://github.com/Hypurrnating/Donut"
 git-repository-icon = "fa-github"
 
 [preprocessor.alerts]
+
+[output.html]
+default-theme = "mocha"
