@@ -1,8 +1,7 @@
 # Summary
 
-- [Home](./home.md)
+- [Introduction](./home.md)
 
-# Bot Features
-- [Events](./events/main.md)
-    - [Setup](./events/setup.md)
-    - [Start and manage events](./events/start.md)
+- [Get Started](./get_started/main.md)
+    - [Templates](./get_started/templates.md)
+
