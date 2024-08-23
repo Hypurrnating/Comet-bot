@@ -12,3 +12,5 @@ git-repository-icon = "fa-github"
 
 [output.html]
 default-theme = "mocha"
+git-repository-url = "https://github.com/Hypurrnating/Donut"
+git-repository-icon = "fa-github"
