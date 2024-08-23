@@ -1,4 +1,4 @@
-Welcome to the Donut Docs!
+# Welcome to the Donut Docs
 
 This includes most of the information you need about the bot, including how to use it.
 
