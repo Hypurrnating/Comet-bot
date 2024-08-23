@@ -41,13 +41,13 @@ jobs:
           cargo install --version ${MDBOOK_VERSION} mdbook
           cargo install mdbook-alerts  # Custom line added by me to support some github flavored aspects  https://github.com/lambdalisue/rs-mdbook-alerts
           cargo install mdbook-catppuccin  # https://github.com/catppuccin/mdBook
-          mdbook-catppuccin install
       - name: Setup Pages
         id: pages
         uses: actions/configure-pages@v5
       - name: Build with mdBook
         run: | 
             cd ./docs
+            mdbook-catppuccin install
             mdbook build
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
