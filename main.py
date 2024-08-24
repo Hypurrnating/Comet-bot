@@ -64,15 +64,47 @@ class Donut(discord.ext.commands.Bot):
             donut_guild = await self.fetch_guild('1275039951439794221')
             subscription_role = await donut_guild.fetch_role('1276860234773692437')
             # Fetch the guilds fresh maybe?
+            active_subscribers: typing.List[discord.Member] = list()
 
-            subscribers = list()
-
+            # Get everyone with the subscriber role
             async for member in donut_guild.fetch_members():
                 if subscription_role in member.roles:
-                    subscribers.append(member)
+                    active_subscribers.append(member)
 
+            # Get needed data from db
             async with self.psql.acquire() as connection:
                 _recorded_subscribers = await connection.fetch('SELECT * FROM subscribed_members')
+                _recorded_oauths = await connection.fetch('SELECT * FROM discord_oauth WHERE user_guilds IS NOT NULL')
+            
+            # Sort data by ID
+            recorded_subscribers = dict()
+            recorded_oauths = dict()
+            for record in _recorded_subscribers:
+                recorded_subscribers[record['user_id']] = record
+            for record in recorded_oauths:
+                recorded_oauths[record['user_id']] = record
+            
+            # Remove all subscribers who aren't subscribed anymore
+            outgoing_subscribers = list()
+            for user_id in recorded_subscribers.keys():
+                if not user_id in active_subscribers:
+                    outgoing_subscribers.append(user_id)
+            
+            async with self.psql.acquire() as connection:
+                # Remove outgoing subscribers
+                for user_id in outgoing_subscribers:
+                    await connection.execute(f'DELETE FROM subscribed_members WHERE user_id = $1', int(user_id))
+                
+                # Append new subscribers
+                for user in active_subscribers:
+                    await connection.execute(f'INSERT INTO subscribed_members(user_id, user_name, user_guilds)' 
+                                             f'ON CONFLICT(user_id) DO UPDATE SET user_name = $2, user_guilds = $3',
+                                             int(user.id),
+                                             str(user.username),
+                                             json.dumps(user.mutual_guilds))
+                
+            
+            
             
 
         @self.command(name='sync')
