@@ -69,13 +69,10 @@ class event_cog(discord.ext.commands.Cog):
         # TODO: Log event
 
     # This is a listener which will listen for *all* message deletes and check whether they had something to do with an event
+    # This is also a big problem because why should I make a redis call for every message delete? Is this worth the cost.
     @discord.ext.commands.Cog.listener(name='on_raw_message_delete')
     async def event_garbcol_message_delete(self, payload: discord.RawMessageDeleteEvent):
-        # Not a lot of easy sanity checks are possible, so we will just try to make do
-        if payload.cached_message:
-            if not payload.cached_message.author.bot: 
-                return
-        # Finally call redis and make absolutely sure that this was an ongoing event, then garbage it.
+        # A call redis and make sure that this was an ongoing event, then garbage it.
         event = await self.bot.get_event(payload.message_id)
         if not event:
             return
@@ -94,7 +91,7 @@ class event_cog(discord.ext.commands.Cog):
             last_interested = max(interests) if interests else event['utc']
             last_attendee = max(attends) if attends else event['utc']
             last_activity = max([last_interested, last_attendee])
-            if (self.bot.now_utc_timestamp - last_activity) > timedelta(hours=6).seconds:
+            if (self.bot.now_utc_timestamp - last_activity) > timedelta(hours=4).seconds:
                 await self.garbage_event(event_id, event, message=True)
                 garbaged.append(event_id)
 
