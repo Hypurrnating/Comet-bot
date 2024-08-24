@@ -70,6 +70,7 @@ class event_cog(discord.ext.commands.Cog):
 
     # This is a listener which will listen for *all* message deletes and check whether they had something to do with an event
     # This is also a big problem because why should I make a redis call for every message delete? Is this worth the cost.
+    # UPDATE: Yeah so this useless, since the intent required for this has been disabled
     @discord.ext.commands.Cog.listener(name='on_raw_message_delete')
     async def event_garbcol_message_delete(self, payload: discord.RawMessageDeleteEvent):
         # A call redis and make sure that this was an ongoing event, then garbage it.
