@@ -233,20 +233,30 @@ class Donut(discord.ext.commands.Bot):
                 webhook = None
                 async with self.bot.psql.acquire() as connection:
                     await connection.execute(f'DELETE FROM channel_webhooks WHERE channel_id = $1', int(channel.id))
-        if webhook:
-            if not await self.is_bot_webhook(webhook):    # Kinda useless line but oh well
-                async with self.bot.psql.acquire() as connection:
-                    await connection.execute(f'DELETE FROM channel_webhooks WHERE channel_id = $1', int(channel.id))
         
         if not webhook:
             for webhook in await channel.webhooks():
                 if await self.is_bot_webhook(webhook):
-                    # TODO: Store in pg db
+                    async with self.psql.acquire() as connection:
+                        await connection.execute(f'INSERT INTO channel_webhooks(channel_id, url) VALUES ($1, $2)'
+                                                 f'ON CONFLICT(channel_id) DO UPDATE channel_id=$1, url=$2', 
+                                                 int(channel.id), str(webhook.url))
                     webhook = webhook
         if not webhook:
-            webhook = await channel.create_webhook(name=self.user.name, avatar=await self.user.avatar.read())
+            # The try except below is important, because the limit for webhooks is 15. 
+            # By deleting all the bots current webhooks in the guild, we can make sure that all useless ones are purged, as
+            # new ones will be created dynamically.
+            try:
+                webhook = await channel.create_webhook(name=self.user.name, avatar=await self.user.avatar.read())
+            except:
+                for webhook in (await channel.guild.webhooks()):
+                    if await self.is_bot_webhook(webhook):
+                        await webhook.delete()
+                webhook = await channel.create_webhook(name=self.user.name, avatar=await self.user.avatar.read())
             async with self.bot.psql.acquire() as connection:
-                await connection.execute(f'INSERT INTO channel_webhooks(channel_id, url) VALUES ($1, $2)', int(channel.id), str(webhook.url))
+                await connection.execute(f'INSERT INTO channel_webhooks(channel_id, url) VALUES ($1, $2)'
+                                         f'ON CONFLICT(channel_id) DO UPDATE channel_id=$1, url=$2',
+                                         int(channel.id), str(webhook.url))
 
         return webhook
 
