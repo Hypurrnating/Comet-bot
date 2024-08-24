@@ -1,5 +1,6 @@
 import discord
 import discord.ext.commands  # Doesn't generate the docs if you dont import this
+import discord.ext.tasks
 import asyncpg
 import redis
 import logging
@@ -43,8 +44,7 @@ class Donut(discord.ext.commands.Bot):
     async def load_extensions(self):
         for x in pathlib.Path(f'./extensions').iterdir():
             if x.is_file():
-                if not x.name in ['starboard.py']:
-                    await self.load_extension(f'extensions.{x.name.split(".")[0]}')
+                await self.load_extension(f'extensions.{x.name.split(".")[0]}')
         if platform.system() == 'Windows':    # Host is usually Linux, so this would mean its being run on my local machine
             await self.load_extension('jishaku')
             logging.info('Loaded jishaku')
@@ -59,6 +59,22 @@ class Donut(discord.ext.commands.Bot):
 
 
     def setup_ctx_commands(self):
+        @discord.ext.tasks.loop(hours=12)
+        async def update_subscriptions():
+            donut_guild = await self.fetch_guild('1275039951439794221')
+            subscription_role = await donut_guild.fetch_role('1276860234773692437')
+            # Fetch the guilds fresh maybe?
+
+            subscribers = list()
+
+            async for member in donut_guild.fetch_members():
+                if subscription_role in member.roles:
+                    subscribers.append(member)
+
+            async with self.psql.acquire() as connection:
+                _recorded_subscribers = await connection.fetch('SELECT * FROM subscribed_members')
+            
+
         @self.command(name='sync')
         async def sync_command(ctx: discord.ext.commands.Context):
             if not ctx.author.id == self.bot.owner_id:
