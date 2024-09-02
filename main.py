@@ -21,11 +21,11 @@ import redis.connection
 
 load_dotenv()
 
-class Donut(discord.ext.commands.Bot):
+class Comet(discord.ext.commands.Bot):
     def __init__(self, **options):
         intents = discord.Intents.default()
         intents.messages = True
-        super().__init__(description='Donut :3',
+        super().__init__(description='Comet :3',
                          command_prefix=discord.ext.commands.when_mentioned,
                          intents=intents,
                          owner_id=1226476776683868241
@@ -61,13 +61,13 @@ class Donut(discord.ext.commands.Bot):
     def setup_ctx_commands(self):
         @discord.ext.tasks.loop(hours=12)
         async def update_subscriptions():
-            donut_guild = await self.fetch_guild('1275039951439794221')
-            subscription_role = await donut_guild.fetch_role('1276860234773692437')
+            comet_guild = await self.fetch_guild('1275039951439794221')
+            subscription_role = await comet_guild.fetch_role('1276860234773692437')
             # Fetch the guilds fresh maybe?
             active_subscribers: typing.List[discord.Member] = list()
 
             # Get everyone with the subscriber role
-            async for member in donut_guild.fetch_members():
+            async for member in comet_guild.fetch_members():
                 if subscription_role in member.roles:
                     active_subscribers.append(member)
 
@@ -305,7 +305,7 @@ class Donut(discord.ext.commands.Bot):
                 # then find the event and handle that
 
 async def main():
-    bot = Donut()
+    bot = Comet()
     logging.info('Initialized bot')
     _redis = redis.Redis(host=os.environ.get('REDISHOST'),
                          port=os.environ.get('REDISPORT'),

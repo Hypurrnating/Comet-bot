@@ -20,11 +20,11 @@ from sorcery import dict_of
 from datetime import datetime, timedelta, timezone
 
 sys.path.insert(0, '..')
-import main as donut
+import main as comet
 from discord.utils import MISSING
 
 class event_cog(discord.ext.commands.Cog):
-    def __init__(self, bot: donut.Donut) -> None:
+    def __init__(self, bot: comet.Comet) -> None:
         self.bot = bot
         super().__init__()
         self.bot.tree.add_command(app_commands.ContextMenu(
@@ -99,7 +99,7 @@ class event_cog(discord.ext.commands.Cog):
     """ Views """
     
     class _event_announcement_view(discord.ui.View):
-        def __init__(self, *, client: donut.Donut, event_id: int, information_label: str = 'Information', timeout=None):
+        def __init__(self, *, client: comet.Comet, event_id: int, information_label: str = 'Information', timeout=None):
             self.event_id = event_id
             self.bot = client
             super().__init__(timeout=timeout)
@@ -298,7 +298,7 @@ class event_cog(discord.ext.commands.Cog):
         action_button.label = 'Join Event'
         action_button.style = discord.ButtonStyle.url
         action_button.custom_id = None
-        url = f'https://donut.imady.pro/event/{urllib.parse.quote((event['Configuration']['title']).replace(' ', '-'))}/{event['id']}'
+        url = f'https://comet.imady.pro/event/{urllib.parse.quote((event['Configuration']['title']).replace(' ', '-'))}/{event['id']}'
         action_button.url = url
         webhook = await self.bot.grab_webhook(message.channel)
         await webhook.edit_message(message_id=message.id, view=view)
@@ -371,5 +371,5 @@ class event_cog(discord.ext.commands.Cog):
 
 
 
-async def setup(bot: donut.Donut):
+async def setup(bot: comet.Comet):
     await bot.add_cog(event_cog(bot))
