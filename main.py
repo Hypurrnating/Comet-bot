@@ -23,7 +23,7 @@ load_dotenv()
 
 class Donut(discord.ext.commands.Bot):
     def __init__(self, **options):
-        intents = discord.Intents.none()
+        intents = discord.Intents.default()
         intents.messages = True
         super().__init__(description='Donut :3',
                          command_prefix=discord.ext.commands.when_mentioned,

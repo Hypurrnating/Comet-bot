@@ -28,8 +28,6 @@ class event_cog(discord.ext.commands.Cog):
         self.bot = bot
         super().__init__()
         self.bot.tree.add_command(app_commands.ContextMenu(
-            name='Create an event', callback=self.create_event_ctx, allowed_contexts=app_commands.AppCommandContext.GUILD))
-        self.bot.tree.add_command(app_commands.ContextMenu(
             name='End this event', callback=self.end_event_ctx, allowed_contexts=app_commands.AppCommandContext.GUILD))
         self.bot.tree.add_command(app_commands.ContextMenu(
             name='Edit this event', callback=self.edit_event_ctx, allowed_contexts=app_commands.AppCommandContext.GUILD))
@@ -138,13 +136,6 @@ class event_cog(discord.ext.commands.Cog):
                                             username=event['Webhook']['webhook_name'] or interaction.guild.name,
                                             avatar_url=event['Webhook']['webhook_avatar_url'] or interaction.guild.icon.url)
         
-        async def on_timeout(self) -> None:     # TODO: see if this is useless or not
-            event = await self.bot.get_event(self.event_id)
-            await self.bot.clear_event(self.event_id)
-            channel = self.bot.get_channel(event['channel_id']) or await self.bot.fetch_channel(event['channel_id'])
-            message = channel.get_partial_message(event['announcement_id'])
-            await message.delete()
-            # TODO: Log event on timeout
 
 
     class _create_event_param_view(discord.ui.View):
@@ -211,7 +202,8 @@ class event_cog(discord.ext.commands.Cog):
 
     """ Interactions """
 
-    async def _create_event(self, interaction: discord.Interaction, config: dict):
+    async def _create_event(self, interaction: discord.Interaction, _config: dict):
+        config = _config['data']
         for event in (await self.bot.get_all_events()).values():
             if (event['host'] == interaction.user.id) and (event['guild_id'] == interaction.guild.id):
                 await interaction.followup.send(f'You have already started an event in this guild.\n Please end it, or wait for at least 6 hours.', ephemeral=True)
@@ -223,7 +215,7 @@ class event_cog(discord.ext.commands.Cog):
         config['interested'] = dict()
 
         view = self._create_event_param_view(config=config)
-        msg: discord.WebhookMessage = await interaction.followup.send(f'', view=view)
+        msg: discord.WebhookMessage = await interaction.followup.send(f'', view=view, ephemeral=True)
         view.message = msg
         await view.wait()
         await msg.edit(content='<a:HourGlass:1273332047276150826>', view=None)
@@ -236,11 +228,11 @@ class event_cog(discord.ext.commands.Cog):
             for param in config['params'].keys():
                 embed.add_field(name=param, value=config['params'][param])
         
-        # We send the announcement message without the embed/view at first because we need to set the message id and event id
+        # We send the announcement message without the embed/view at first because we need to set the message id which is event id
         announcement = await webhook.send(content=f'-# Event Announcement',
                                           wait=True,
                                           username=config['Webhook']['webhook_name'] or interaction.guild.name,
-                                          avatar_url=config['Webhook']['webhook_avatar_url'] or interaction.guild.icon.url)
+                                          avatar_url=config['Webhook']['webhook_avatar_url'] or (interaction.guild.icon.url if interaction.guild.icon else None))
         config['guild_id'] = interaction.guild_id
         config['channel_id'] = interaction.channel_id
         # announcement and message are interchangeable
@@ -265,14 +257,6 @@ class event_cog(discord.ext.commands.Cog):
             raise exception
         await msg.edit(content=f'Announced! {announcement.jump_url}', view=None)
 
-
-    @app_commands.guild_only()
-    @app_commands.checks.has_permissions(create_events = True, manage_events = True)
-    async def create_event_ctx(self, interaction: discord.Interaction, message: discord.Message):
-        await interaction.response.defer(ephemeral=True, thinking=True)
-        
-        await interaction.followup.send(f'Click on the link below to create a template.'
-                                        f'\nhttps://donut.imady.pro/template/create/{interaction.guild.id}') # TODO: need a better way to get url scheme
 
     @app_commands.guild_only()
     @app_commands.checks.has_permissions(manage_events=True)
@@ -349,44 +333,40 @@ class event_cog(discord.ext.commands.Cog):
                                         '-# Keep in mind that co hosts are purely for organization and logging, '
                                         'and the member has not been granted any special permissions.')
 
+    @event_group.command(name='start', description='Start an event')
+    @discord.app_commands.describe()
+    async def event_new(self, interaction: discord.Interaction):
+        await interaction.response.defer(ephemeral=True, thinking=True)
+        async with self.bot.psql.acquire() as connection:
+            resp = await connection.fetch('SELECT * FROM templates WHERE guild_id = $1 AND disabled = $2', int(interaction.guild.id), bool(False))
+        if not resp:
+            await interaction.followup.send('There are no templates for this server.')
+            return
+        templates = [dict(template) for template in resp]
+        for template in templates:
+            _data = json.loads(template['data'])
+            template['data'] = _data
 
-    @event_group.command(name='new',
-                                  description='Start a new event')
-    @discord.app_commands.describe(title='Title of the event.',
-                                   description='What is this event about?',
-                                   post_to='Where should the event be announced?',
-                                   use_discord_event='Whether or not a discord event should be started alongside')
-    async def event_new(self, interaction: discord.Interaction,
-                        title: str,
-                        description: str,
-                        type: typing.Literal['URL Join', 'Instructions'],
-                        post_to: discord.TextChannel,
-                        thumbnail: discord.Attachment = None,
-                        use_discord_event: bool = True,
-                        ):
-        modal = self.event_instructions_modal(title='Now tell users how to join', type=type)
-        await interaction.response.send_modal(modal)
-        await modal.wait()
-        if not modal._join.value: return
-        if modal._join.value == 'URL Join':
-            if not validators.url(modal._join.value):
-                await interaction.followup.send(f'The URL you provided is invalid: {modal._join.value}')
-        
-        url_safe_title = urllib.parse.quote(title.replace(' ', '_'))
-        internal_join_url = self.build_internal_join_url(guild_id=interaction.guild.id, event_id=interaction.id, event_title=url_safe_title)
-        
+        class select(discord.ui.Select):
+            def __init__(self, cog, templates):
+                self.cog = cog
+                self.templates = templates
+                self.interaction = interaction
+                super().__init__()
+                for template in self.templates:
+                    self.add_option(label=template['data']['Configuration']['title'], value=template['id'])
+            async def callback(self, interaction: Interaction):
+                await interaction.response.defer()
+                selected = self.values[0]
+                for template in self.templates:
+                    if int(template['id']) == int(selected):
+                        await interaction.delete_original_response()
+                        await self.cog._create_event(interaction, template)
 
-    class event_instructions_modal(discord.ui.Modal):
-        def __init__(self, title: str, type: typing.Literal['URL Join', 'Instructions'], timeout: float | None = None, custom_id: str = None) -> None:
-            if type == 'URL Join':
-                _join = discord.ui.TextInput(label='Enter URL', style=discord.TextStyle.short)
-            elif type == 'Instructions':
-                _join = discord.ui.TextInput(label='Enter join instructions', style=discord.TextStyle.long)
+        view = discord.ui.View()
+        view.add_item(select(cog=self, templates=templates))
+        await interaction.followup.send(content='Choose a template to start from', view=view)
 
-            super().__init__(title=title, timeout=timeout, custom_id=custom_id)
-        
-        async def on_submit(self, interaction: Interaction) -> None:
-            await interaction.response.defer()
 
 
 
