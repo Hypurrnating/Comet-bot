@@ -99,31 +99,35 @@ class event_cog(discord.ext.commands.Cog):
     """ Views """
     
     class _event_announcement_view(discord.ui.View):
-        def __init__(self, *, client: comet.Comet, event_id: int, information_label: str = 'Information', timeout=None):
+        def __init__(self, *, client: comet.Comet, event_id: int, information_label: str = 'Information', timeout=None, event_data=None):
             self.event_id = event_id
             self.bot = client
             super().__init__(timeout=timeout)
             self.information.label = information_label
             self.information.custom_id = self.information.custom_id + f'_{event_id}'
+            if event_data:
+                if not event_data['FAQ'].get('information') and not event_data['FAQ'].get('buttons'):
+                    self.information.disabled = True
             self.action.custom_id = self.action.custom_id + f'_{event_id}'
         
         @discord.ui.button(label='I\'m interested', style=discord.ButtonStyle.green, custom_id='action')
         async def action(self, interaction: discord.Interaction, button: discord.ui.Button):
-            await interaction.response.defer()
+            await interaction.response.defer(thinking=True, ephemeral=True)
             user_id = interaction.user.id
             user_data = dict(name=interaction.user.display_name,
                              username=interaction.user.global_name,
                              avatar_url=interaction.user.display_avatar.url)
             await interaction.client.add_interested(self.event_id, user_id, user_data)
+            await interaction.followup.send('Okay! You will receive a DM notification when the event starts.')
         
         @discord.ui.button(style=discord.ButtonStyle.gray, custom_id = 'information')  # Label is handled by init
         async def information(self, interaction: discord.Interaction, button: discord.ui.Button):
             await interaction.response.defer(ephemeral=True, thinking=True)
             event = await interaction.client.get_event(self.event_id)
-            msg = f"This is an event hosted by the server (using {interaction.client.user.mention}). "\
-            "If you are interested in this event, you can press the button on the left and wait for it start. "\
-            "Sometimes event managers might be waiting for enough people to become interested before starting. "\
-            "Pressing that button will help them choose whether they should start the event or not. " + "\n\n" + event['FAQ']['information']
+            if not event['FAQ'].get('information') and not event['FAQ'].get('buttons'):
+                self.information.disabled = True
+
+            msg = event['FAQ'].get('information', '')
 
             view = discord.ui.View(timeout=None)
             for butt in event['FAQ']['buttons'].keys():
@@ -140,7 +144,7 @@ class event_cog(discord.ext.commands.Cog):
 
     class _create_event_param_view(discord.ui.View):
         def __init__(self, *, config: dict = None, timeout=None):
-            self.message = None
+            self.message: discord.Message = None
             self.config = config
             
             self.param_resp = None
@@ -173,7 +177,8 @@ class event_cog(discord.ext.commands.Cog):
             if self.url_resp and self.param_resp:
                 self.stop()
                 return
-            await self.message.edit(view=self)
+            await self.message.edit(content=('Please fill out the required information.\n`THE URL ENTERED IS INVALID`' if button.style == discord.ButtonStyle.red else 'Please fill out the required information.'), 
+                                    view=self)
 
         @discord.ui.button(label='Fill parameters', style=discord.ButtonStyle.blurple)
         async def params(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -215,7 +220,7 @@ class event_cog(discord.ext.commands.Cog):
         config['interested'] = dict()
 
         view = self._create_event_param_view(config=config)
-        msg: discord.WebhookMessage = await interaction.followup.send(f'', view=view, ephemeral=True)
+        msg: discord.WebhookMessage = await interaction.followup.send(f'Please fill out the required information.', view=view, ephemeral=True)
         view.message = msg
         await view.wait()
         await msg.edit(content='<a:HourGlass:1273332047276150826>', view=None)
@@ -245,7 +250,7 @@ class event_cog(discord.ext.commands.Cog):
         config['started'] = False
         config['co_hosts'] = list()
 
-        view = self._event_announcement_view(client=self.bot, event_id=config['id'], information_label=config['FAQ']['label'])
+        view = self._event_announcement_view(client=self.bot, event_id=config['id'], information_label=config['FAQ']['label'], event_data=config)
 
         announcement = await webhook.edit_message(announcement.id,
                                                   embed=embed,
@@ -293,7 +298,7 @@ class event_cog(discord.ext.commands.Cog):
         event['started'] = True
         await self.bot.set_event(event)
         
-        view = self._event_announcement_view(client=self.bot, event_id=event['id'], information_label=event['FAQ']['label'])
+        view = self._event_announcement_view(client=self.bot, event_id=event['id'], information_label=event['FAQ']['label'], event_data=event)
         action_button: discord.ui.Button = [button for button in view.children if button.custom_id == f'action_{event['id']}'][0]
         action_button.label = 'Join Event'
         action_button.style = discord.ButtonStyle.url
