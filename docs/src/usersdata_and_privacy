@@ -1,0 +1,25 @@
+# Privacy Concerns
+The bot itself does not collect any special data. The bot is open source so you can actually view how it does *everything*.
+The website is mostly what will be discussed in this section.
+
+To start: Violations to another users privacy is strictly 
+
+## How your location data is collected and stored.
+Information about where you are is derived from the IP address using a MaxMind GeoLite2 Country database. 
+This means that:
+1. Due to the data effectively being an educated guess, it's not reliable.
+2. Only information about your *country* is available. Not even timezone is asked for.
+
+These are both wins for your privacy.
+
+This information is collected whenever you join an event, and is temporarily stored under your profile in our database. However, this raw data is not accessible to users.\
+In fact, all location data is anonymized as soon as a session ends. So that means that other users (such as a host) can not know which user joined from which country. All they know is X amount of users joined from X country.
+
+## Comet is not a doxxing service
+Location data is collected strictly for analytics purposes, and attempting to use our service to deduce the location of a user is strictly against our policy.
+
+To prevent this, we take several measures:
+1. **Location data is not recorded for sessions with a low number of attendees.** This makes it much harder to deduce the location of attendees. One can not start an event for only one attendee.
+2. **User consent.**
+    1. The first time a user joins a session on Comet, it asks for their express permission to include their anonymous location data. They can change this setting at any time
+    2. A user can stop a specific server from receiving their anonymous location. They can change this setting at any time.
