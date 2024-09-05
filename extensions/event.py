@@ -18,6 +18,8 @@ import sorcery
 import logging
 from sorcery import dict_of
 from datetime import datetime, timedelta, timezone
+from bs4 import BeautifulSoup
+import aiohttp
 
 sys.path.insert(0, '..')
 import main as comet
@@ -209,6 +211,8 @@ class event_cog(discord.ext.commands.Cog):
 
     async def _create_event(self, interaction: discord.Interaction, _config: dict):
         config = _config['data']
+        config['template_id'] = _config['id']
+        await interaction.edit_original_response(content='Creating event <a:HourGlass:1273332047276150826>', view=None)
         for event in (await self.bot.get_all_events()).values():
             if (event['host'] == interaction.user.id) and (event['guild_id'] == interaction.guild.id):
                 await interaction.followup.send(f'You have already started an event in this guild.\n Please end it, or wait for at least 6 hours.', ephemeral=True)
@@ -227,8 +231,27 @@ class event_cog(discord.ext.commands.Cog):
         config['params'] = view.param_resp
         config['join_url'] = view.url_resp
 
+        game = None
+        try:
+            async with aiohttp.ClientSession() as connection:
+                resp = await connection.get(config['join_url'])
+                response = await resp.read()
+            soup = BeautifulSoup(response, 'html.parser')
+            # TODO: Should probably just read from og:title
+            meta_description = soup.find('meta', {'name': 'description'}).get('content', '')
+            game = meta_description.split('Check out ')[1].split('. It’s one of the millions')[0]
+        except:
+            pass
+        config['game'] = game
+
         embed = discord.Embed(title=config['Configuration']['title'],
                               description=config['Configuration']['description'])
+        if game:
+            embed.add_field(
+                name='Game:',
+                value=config['game'],
+                inline=False
+            )
         if config.get('Parameters'):
             for param in config['params'].keys():
                 embed.add_field(name=param, value=config['params'][param])
@@ -245,7 +268,7 @@ class event_cog(discord.ext.commands.Cog):
         config['message_id'] = announcement.id
         config['id'] = announcement.id
         config['host'] = interaction.user.id
-        config['utc'] = self.bot.now_utc_timestamp
+        config['created_utc'] = self.bot.now_utc_timestamp
         config['locked'] = False
         config['started'] = False
         config['co_hosts'] = list()
@@ -272,10 +295,49 @@ class event_cog(discord.ext.commands.Cog):
         if not type(event) == dict:  # idfk what redispy returns on fail
             await interaction.followup.send(f'This is an invalid event (i.e. expired).')
             return
+        interested = await interaction.client.get_interested(message.id) or {}
+        attendees = await interaction.client.get_attendees(message.id) or {}
         
+        event['ended_utc'] = self.bot.now_utc_timestamp
         await interaction.client.clear_event(event['id'])
         await message.delete()
-        await interaction.followup.send('Cleared!') # TODO: log in channel
+
+        async with self.bot.psql.acquire() as connection:
+            await connection.execute('INSERT INTO events(guild_id, host_id, cohosts, event_id, created_utc, ended_utc, interested, attended, event_data)'
+                                     'VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9)',
+                                     int(event['guild_id']),
+                                     int(event['host']),
+                                     json.dumps(event['co_hosts']),
+                                     int(event['id']),
+                                     int(event['created_utc']),
+                                     int(event['ended_utc']),
+                                     json.dumps(interested),
+                                     json.dumps(attendees),
+                                     json.dumps(event),)
+
+        embed = discord.Embed(title=f'{event['Configuration']['title']} Log')
+        embed.add_field(name='Hosted by', value=f'<@{event['host']}>')
+        embed.add_field(name='Co-hosts', value=f'{", ".join([f"<@{co_host}>" for co_host in event['co_hosts']])}')
+        embed.add_field(name='Duration', value=f'Created: <t:{event['created_utc']}:f>\n  Ended: <t:{event['ended_utc']}:f>')
+        embed.add_field(name='Game', value=f'{event['game']}')
+        embed.add_field(name='Interested', value=f'{len(interested)}')
+        embed.add_field(name='Attendees', value=f'{len(attendees) if event['started'] else 'This session never started.'}')
+        embed.add_field(name=f'Original join URL', value=f'{event['join_url']}')
+        view = discord.ui.View()
+        button = discord.ui.Button(label='View Logs', 
+                                   url=f'https://comet.imady.pro/event/{event['id']}/log', 
+                                   style=discord.ButtonStyle.url)
+        view.add_item(button)
+        
+        try:
+            await self.bot.get_partial_messageable(id=event['Configuration']['log_channel_id']).send(embed=embed, view=view)
+        except Exception as exc:
+            await interaction.followup.send(f'Cleared!\n'
+                                            f'`WARNING: Could not send session log to channel: {exc}\n'
+                                            f'`Please use the button below to visit the log, and store this link manually`',
+                                            view=view)  
+            return
+        await interaction.followup.send('Cleared!') 
 
     @app_commands.guild_only()
     @app_commands.checks.has_permissions(manage_events=True)
@@ -310,13 +372,16 @@ class event_cog(discord.ext.commands.Cog):
         await interaction.followup.send(f'Started')
         # TODO: register as started in redis cache too
 
-        for user_id, user_data in (await self.bot.get_interested(event_id=event['id'])).items():
-            member = message.guild.get_member(user_id) or await message.guild.fetch_member(user_id)
+        coros = list()
+        async def send_start_notif(member: discord.member):
             try:
                 await member.send(content=f'An event that you showed interest for has started. {message.jump_url}')
             except:
                 pass
-
+        for user_id, user_data in (await self.bot.get_interested(event_id=event['id'])).items():
+            member = message.guild.get_member(user_id) or await message.guild.fetch_member(user_id)
+            coros.append(send_start_notif(member))
+        asyncio.gather(*coros)
 
     @app_commands.guild_only()
     @app_commands.checks.has_permissions(manage_events=True)
@@ -336,9 +401,9 @@ class event_cog(discord.ext.commands.Cog):
         await self.bot.set_event(event)
         await interaction.followup.send(f'Added {member.mention} to the co hosts!\n'
                                         '-# Keep in mind that co hosts are purely for organization and logging, '
-                                        'and the member has not been granted any special permissions.')
+                                        'and that the member has not been granted any special permissions.')
 
-    @event_group.command(name='start', description='Start an event')
+    @event_group.command(name='create', description='Create an event')
     @discord.app_commands.describe()
     async def event_new(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True, thinking=True)
@@ -365,7 +430,6 @@ class event_cog(discord.ext.commands.Cog):
                 selected = self.values[0]
                 for template in self.templates:
                     if int(template['id']) == int(selected):
-                        await interaction.delete_original_response()
                         await self.cog._create_event(interaction, template)
 
         view = discord.ui.View()

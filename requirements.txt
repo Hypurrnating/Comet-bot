@@ -6,3 +6,5 @@ python-dotenv
 quart
 validators
 sorcery
+bs4
+aiohttp
