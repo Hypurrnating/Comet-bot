@@ -98,7 +98,9 @@ class event_cog(discord.ext.commands.Cog):
 
         logging.info(f'Garbaged {len(garbaged)} events.\n{garbaged}')
 
-    """ Views """
+    """ 
+        Views 
+    """
     
     class _event_announcement_view(discord.ui.View):
         def __init__(self, *, client: comet.Comet, event_id: int, information_label: str = 'Information', timeout=None, event_data=None):
@@ -207,7 +209,9 @@ class event_cog(discord.ext.commands.Cog):
             await self.message.edit(view=self)
 
 
-    """ Interactions """
+    """ 
+        Interactions 
+    """
 
     async def _create_event(self, interaction: discord.Interaction, _config: dict):
         config = _config['data']
